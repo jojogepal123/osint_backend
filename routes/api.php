@@ -11,13 +11,6 @@ use App\Http\Controllers\ReportController;
 
 
 
-//auth
-// Registration toggle status (for frontend)
-Route::get('/registration-status', function () {
-    return response()->json([
-        'registration_enabled' => config('auth.registration_enabled'),
-    ]);
-});
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
 
