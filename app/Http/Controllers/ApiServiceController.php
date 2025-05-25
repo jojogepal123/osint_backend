@@ -36,8 +36,15 @@ class ApiServiceController extends Controller
             // 'surepassKyc' => null, // Surepass KYC API
             // 'surepassUpi' => null, // Surepass UPI API
             // 'surepassBank' => null, // Surepass Bank API
+            // 'telegramData' => null,
             'osintData' => null,
         ];
+        // // 🔹 Telegram Data
+        // $data['telegramData'] = $this->callApiWithCatch(function () use ($number) {
+        //     return Http::post('http://127.0.0.1:8080/search/telegram/', [
+        //         'query' => $number
+        //     ])->json();
+        // }, 'telegram', $number);
 
         // 🔹 OSINT Data
         $data['osintData'] = $this->callApiWithCatch(function () use ($number) {
