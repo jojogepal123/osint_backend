@@ -31,15 +31,15 @@ class ApiServiceController extends Controller
             'truecallerData' => null,
             'allMobileData' => null,
             'socialMediaData' => null,
-            // 'surepassKyc' => null, // Surepass KYC API
-            // 'surepassUpi' => null, // Surepass UPI API
-            // 'surepassBank' => null, // Surepass Bank API
+            'surepassKyc' => null, // Surepass KYC API
+            'surepassUpi' => null, // Surepass UPI API
+            'surepassBank' => null, // Surepass Bank API
             'telegramData' => null,
             'osintData' => null,
         ];
         // 🔹 Telegram Data
         $data['telegramData'] = $this->callApiWithCatch(function () use ($number) {
-            return Http::post('http://127.0.0.1:8080/api/telegram/', [
+            return Http::post('http://127.0.0.1:5000/api/telegram/', [
                 'phone' => $number
             ])->json();
         }, 'telegram', $number);
@@ -48,7 +48,7 @@ class ApiServiceController extends Controller
         $data['osintData'] = $this->callApiWithCatch(function () use ($number) {
             return Http::withHeaders([
                 'x-api-key' => env('X_API_KEY'),
-            ])->get('http://127.0.0.1:5000/api/search/', [
+            ])->get('https://datapool.site/api/search/', [
                 'phone' => $number,
                 'per_page' => 50,
             ])->json();
@@ -104,35 +104,35 @@ class ApiServiceController extends Controller
         }, 'socialMedia', $number);
 
         // surepass apis
-        // $data['surepassKyc'] = $this->callApiWithCatch(function () use ($localNumber) {
-        //     return Http::withHeaders([
-        //         'Content-Type' => 'application/json',
-        //         // 'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
-        //         'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
-        //     ])->post('https://kyc-api.surepass.io/api/v1/prefill/prefill-by-mobile', [
-        //         'mobile' => $localNumber,
-        //     ])->json();
-        // }, 'surepassKyc', $localNumber);
+        $data['surepassKyc'] = $this->callApiWithCatch(function () use ($localNumber) {
+            return Http::withHeaders([
+                'Content-Type' => 'application/json',
+                // 'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
+                'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
+            ])->post('https://kyc-api.surepass.io/api/v1/prefill/prefill-by-mobile', [
+                'mobile' => $localNumber,
+            ])->json();
+        }, 'surepassKyc', $localNumber);
 
 
-        // $data['surepassUpi'] = $this->callApiWithCatch(function () use ($localNumber) {
-        //     return Http::withHeaders([
-        //         'Content-Type' => 'application/json',
-        //         'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
-        //     ])->post('https://kyc-api.surepass.io/api/v1/bank-verification/mobile-to-multiple-upi', [
-        //         'mobile_number' => $localNumber,
-        //     ])->json();
-        // }, 'surepassUpi', $localNumber);
+        $data['surepassUpi'] = $this->callApiWithCatch(function () use ($localNumber) {
+            return Http::withHeaders([
+                'Content-Type' => 'application/json',
+                'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
+            ])->post('https://kyc-api.surepass.io/api/v1/bank-verification/mobile-to-multiple-upi', [
+                'mobile_number' => $localNumber,
+            ])->json();
+        }, 'surepassUpi', $localNumber);
 
 
-        // $data['surepassBank'] = $this->callApiWithCatch(function () use ($localNumber) {
-        //     return Http::withHeaders([
-        //         'Content-Type' => 'application/json',
-        //         'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
-        //     ])->post('https://kyc-api.surepass.io/api/v1/mobile-to-bank-details/verification', [
-        //         'mobile_no' => $localNumber,
-        //     ])->json();
-        // }, 'surepassBank', $localNumber);
+        $data['surepassBank'] = $this->callApiWithCatch(function () use ($localNumber) {
+            return Http::withHeaders([
+                'Content-Type' => 'application/json',
+                'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
+            ])->post('https://kyc-api.surepass.io/api/v1/mobile-to-bank-details/verification', [
+                'mobile_no' => $localNumber,
+            ])->json();
+        }, 'surepassBank', $localNumber);
 
         // log::info( $data['telegramData']);
         return response()->json($data);
@@ -159,7 +159,7 @@ class ApiServiceController extends Controller
         $data['osintData'] = $this->callApiWithCatch(function () use ($email) {
             return Http::withHeaders([
                 'x-api-key' => env('X_API_KEY'),
-            ])->timeout(60)->get("http://127.0.0.1:5000/api/search/", [
+            ])->timeout(60)->get("http://datapool.site/api/search/", [
                 'email' => $email,
                 'per_page' => 50,
             ])->json();
@@ -168,7 +168,7 @@ class ApiServiceController extends Controller
         // 🔹 Zehef API
         $data['zehefData'] = $this->callApiWithCatch(function () use ($email) {
             return Http::timeout(60) // ⏱ Set BEFORE the request
-                ->post('http://127.0.0.1:8080/api/zehef/', [
+                ->post('http://127.0.0.1:5000/api/zehef/', [
                     'email' => $email,
                 ])
                 ->json();
@@ -177,7 +177,7 @@ class ApiServiceController extends Controller
         // 🔹 Holehe API
         $data['holeheData'] = $this->callApiWithCatch(function () use ($email) {
             return Http::timeout(60) // ⏱ Set BEFORE the request
-                ->post('http://127.0.0.1:8080/api/holehe/', [
+                ->post('http://127.0.0.1:5000/api/holehe/', [
                     'email' => $email,
                 ])
                 ->json();
@@ -200,7 +200,7 @@ class ApiServiceController extends Controller
             ])->timeout(60)->get("https://haveibeenpwned.com/api/v3/breachedaccount/{$email}?truncateResponse=false")->json();
         }, 'hibp', $email);
 
-        log::info($data['holeheData']);
+        // log::info($data['holeheData']);
         return response()->json($data);
     }
 
