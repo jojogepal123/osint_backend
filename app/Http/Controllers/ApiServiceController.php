@@ -159,7 +159,7 @@ class ApiServiceController extends Controller
         $data['osintData'] = $this->callApiWithCatch(function () use ($email) {
             return Http::withHeaders([
                 'x-api-key' => env('X_API_KEY'),
-            ])->timeout(60)->get("http://datapool.site/api/search/", [
+            ])->timeout(60)->get("https://datapool.site/api/search/", [
                 'email' => $email,
                 'per_page' => 50,
             ])->json();
