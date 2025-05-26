@@ -4,8 +4,6 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
-use GuzzleHttp\Client;
-use GuzzleHttp\Exception\RequestException;
 use HlrLookup\HLRLookupClient;
 use Illuminate\Support\Facades\Log;
 
@@ -36,15 +34,15 @@ class ApiServiceController extends Controller
             // 'surepassKyc' => null, // Surepass KYC API
             // 'surepassUpi' => null, // Surepass UPI API
             // 'surepassBank' => null, // Surepass Bank API
-            // 'telegramData' => null,
+            'telegramData' => null,
             'osintData' => null,
         ];
-        // // 🔹 Telegram Data
-        // $data['telegramData'] = $this->callApiWithCatch(function () use ($number) {
-        //     return Http::post('http://127.0.0.1:8080/search/telegram/', [
-        //         'query' => $number
-        //     ])->json();
-        // }, 'telegram', $number);
+        // 🔹 Telegram Data
+        $data['telegramData'] = $this->callApiWithCatch(function () use ($number) {
+            return Http::post('http://127.0.0.1:8080/api/telegram/', [
+                'phone' => $number
+            ])->json();
+        }, 'telegram', $number);
 
         // 🔹 OSINT Data
         $data['osintData'] = $this->callApiWithCatch(function () use ($number) {
@@ -136,7 +134,7 @@ class ApiServiceController extends Controller
         //     ])->json();
         // }, 'surepassBank', $localNumber);
 
-        // log::info('results', $data);
+        // log::info( $data['telegramData']);
         return response()->json($data);
     }
 
@@ -154,6 +152,7 @@ class ApiServiceController extends Controller
             'hibpData' => null,
             'zehefData' => null,
             'osintData' => null,
+            'holeheData' => null,
         ];
 
         // 🔹 Osint API
@@ -170,10 +169,19 @@ class ApiServiceController extends Controller
         $data['zehefData'] = $this->callApiWithCatch(function () use ($email) {
             return Http::timeout(60) // ⏱ Set BEFORE the request
                 ->post('http://127.0.0.1:8080/api/zehef/', [
-                    'query' => $email,
+                    'email' => $email,
                 ])
                 ->json();
         }, 'zehef', $email);
+
+        // 🔹 Holehe API
+        $data['holeheData'] = $this->callApiWithCatch(function () use ($email) {
+            return Http::timeout(60) // ⏱ Set BEFORE the request
+                ->post('http://127.0.0.1:8080/api/holehe/', [
+                    'email' => $email,
+                ])
+                ->json();
+        }, 'holehe', $email);
 
 
         // 🔹 Google Email API
@@ -192,6 +200,7 @@ class ApiServiceController extends Controller
             ])->timeout(60)->get("https://haveibeenpwned.com/api/v3/breachedaccount/{$email}?truncateResponse=false")->json();
         }, 'hibp', $email);
 
+        log::info($data['holeheData']);
         return response()->json($data);
     }
 
