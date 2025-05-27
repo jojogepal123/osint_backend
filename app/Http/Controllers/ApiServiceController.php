@@ -6,6 +6,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use HlrLookup\HLRLookupClient;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Http\Client\ConnectionException;
+use GuzzleHttp\Exception\RequestException; // Import this
 
 class ApiServiceController extends Controller
 {
@@ -14,242 +16,245 @@ class ApiServiceController extends Controller
         return preg_replace('/\D/', '', $number);
     }
 
-
     public function getTelData(Request $request)
     {
-        // Validate the 'number' query parameter
-        $request->validate([
-            'number' => ['required', 'regex:/^\d{10,15}$/'],
-        ]);
+        try {
+            $request->validate([
+                'number' => ['required', 'string', 'max:15'],
+            ]);
 
-        $number = preg_replace('/\D/', '', $request->query('number'));
-        $localNumber = preg_replace('/^91/', '', $number); // for India
+            $number = $this->sanitizePhoneNumber($request->query('number'));
+            $localNumber = preg_replace('/^91/', '', $number); // for India
 
-        $data = [
-            'whatsappData' => null,
-            'hlrData' => null,
-            'truecallerData' => null,
-            'allMobileData' => null,
-            'socialMediaData' => null,
-            'surepassKyc' => null, // Surepass KYC API
-            'surepassUpi' => null, // Surepass UPI API
-            'surepassBank' => null, // Surepass Bank API
-            'telegramData' => null,
-            'osintData' => null,
-        ];
-        // 🔹 Telegram Data
-        $data['telegramData'] = $this->callApiWithCatch(function () use ($number) {
-            return Http::post('http://127.0.0.1:5000/api/telegram/', [
-                'phone' => $number
-            ])->json();
-        }, 'telegram', $number);
+            $urls = [
+                'osint'      => env('OSINTDATA_URL'),
+                'truecaller' => env('TRUECALLERDATA_URL'),
+                'whatsapp'   => env('WHATSAPPDATA_URL'),
+                'telegram'   => env('TELEGRAMDATA_URL'),
+                'allmobile' => env('ALLMOBILEDATA_URL'),
+                'socialmedia' => env('SOCIALMEDIADATA_URL'),
+                // 'spkyc' => env('SPKYC_URL'),
+                // 'spupi' => env('SPUPI_URL'),
+                // 'spbank' => env('SPBANK_URL'),
+            ];
 
-        // 🔹 OSINT Data
-        $data['osintData'] = $this->callApiWithCatch(function () use ($number) {
-            return Http::withHeaders([
-                'x-api-key' => env('X_API_KEY'),
-            ])->get('https://datapool.site/api/search/', [
-                'phone' => $number,
-                'per_page' => 50,
-            ])->json();
-        }, 'osint', $number);
+            try {
+                $requests = [
+                    'osintData' => fn($pool) => $pool->withHeaders([
+                        'x-api-key' => env('X_API_KEY'),
+                    ])->timeout(30)->get($urls['osint'], [
+                        'phone' => $number,
+                        'per_page' => 50,
+                    ]),
 
-        // 🔹 WhatsApp Data
-        $data['whatsappData'] = $this->callApiWithCatch(function () use ($number) {
-            return Http::withHeaders([
-                'x-rapidapi-key' => env('TEL_API_KEY'),
-                'x-rapidapi-host' => env('TEL_API_HOST'),
-            ])->get("https://whatsapp-data1.p.rapidapi.com/number/{$number}")->json();
-        }, 'whatsapp', $number);
+                    'truecallerData' => fn($pool) => $pool->withHeaders([
+                        'x-rapidapi-key' => env('TRUECALLER_API_KEY'),
+                        'x-rapidapi-host' => env('TRUECALLER_API_HOST'),
+                    ])->timeout(30)->get($urls['truecaller'] . "/{$number}"),
 
-        // 🔹 HLR Lookup
-        $data['hlrData'] = $this->callApiWithCatch(function () use ($number) {
-            $client = new HLRLookupClient(
-                env('HLR_API_KEY'),
-                env('HLR_API_SECRET'),
-                storage_path('logs/hlr-lookups.log')
-            );
+                    'whatsappData' => fn($pool) => $pool->withHeaders([
+                        'x-rapidapi-key' => env('TEL_API_KEY'),
+                        'x-rapidapi-host' => env('TEL_API_HOST'),
+                    ])->timeout(30)->get($urls['whatsapp'] . "/{$number}"),
 
-            $response = $client->post('/hlr-lookup', ['msisdn' => $number]);
+                    'telegramData' => fn($pool) => $pool->withHeaders([
+                        'Content-Type' => 'application/json',
+                    ])->timeout(30)->post($urls['telegram'], [
+                        'phone' => $number,
+                    ]),
 
-            if ($response->httpStatusCode === 200) {
-                return $response->responseBody;
+                    'allMobileData' => fn($pool) => $pool->withHeaders([
+                        'x-rapidapi-host' => env('ALL_MOBILE_API_HOST'),
+                        'x-rapidapi-key' => env('ALL_MOBILE_API_KEY'),
+                    ])->timeout(30)->get($urls['allmobile'] . "/{$number}"),
+
+                    'socialMediaData' => fn($pool) => $pool->withHeaders([
+                        'x-rapidapi-key' => env('SOCIAL_MEDIA_API_KEY'),
+                        'x-rapidapi-host' => env('SOCIAL_MEDIA_API_HOST'),
+                    ])->timeout(30)->get($urls['socialmedia'] . "/?phone={$number}"),
+
+                    // 'surepassKyc' => fn($pool) => $pool->withHeaders([
+                    //     'Content-Type' => 'application/json',
+                    //     'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
+                    // ])->timeout(30)->post($urls['spkyc'], [
+                    //     'mobile' => $localNumber,
+                    // ]),
+
+                    // 'surepassUpi' => fn($pool) => $pool->withHeaders([
+                    //     'Content-Type' => 'application/json',
+                    //     'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
+                    // ])->timeout(30)->post($urls['spupi'], [
+                    //     'mobile_number' => $localNumber,
+                    // ]),
+
+                    // 'surepassBank' => fn($pool) => $pool->withHeaders([
+                    //     'Content-Type' => 'application/json',
+                    //     'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
+                    // ])->timeout(30)->post($urls['spbank'], [
+                    //     'mobile_no' => $localNumber,
+                    // ]),
+                ];
+                $responses = Http::pool(fn($pool) => array_map(fn($req) => $req($pool), $requests));
+            } catch (\Exception $e) {
+                Log::error('API Pool Request Error', [
+                    'number' => $number,
+                    'message' => $e->getMessage(),
+                ]);
             }
 
-            throw new \Exception("HLR API HTTP Status: {$response->httpStatusCode}");
-        }, 'hlr', $number);
+            $data = [];
 
-        // 🔹 Truecaller Data
-        $data['truecallerData'] = $this->callApiWithCatch(function () use ($number) {
-            return Http::withHeaders([
-                'x-rapidapi-key' => env('TRUECALLER_API_KEY'),
-                'x-rapidapi-host' => env('TRUECALLER_API_HOST'),
-            ])->get("https://truecaller-data2.p.rapidapi.com/search/{$number}")->json();
-        }, 'truecaller', $number);
+            try {
+                $hlrData = null;
+                $client = new HLRLookupClient(
+                    env('HLR_API_KEY'),
+                    env('HLR_API_SECRET'),
+                    storage_path('logs/hlr-lookups.log')
+                );
 
-        // 🔹 All Mobile Data
-        $data['allMobileData'] = $this->callApiWithCatch(function () use ($number) {
-            return Http::withHeaders([
-                'x-rapidapi-host' => env('ALL_MOBILE_API_HOST'),
-                'x-rapidapi-key' => env('ALL_MOBILE_API_KEY'),
-            ])->get("https://caller-id-api1.p.rapidapi.com/api/phone/info/{$number}")->json();
-        }, 'allMobile', $number);
+                $hlrResponse = $client->post('/hlr-lookup', ['msisdn' => $number]);
+                if ($hlrResponse->httpStatusCode === 200) {
+                    $hlrData = $hlrResponse->responseBody;
+                    $data['hlrData'] = $hlrData;
+                } else {
+                    throw new \Exception("HLR API HTTP Status: {$hlrResponse->httpStatusCode}");
+                }
+            } catch (\Throwable $th) {
+                Log::error('HLR API Error', [
+                    'number' => $number,
+                    'error' => $th->getMessage(),
+                ]);
+            }
 
-        // 🔹 Social Media Data
-        $data['socialMediaData'] = $this->callApiWithCatch(function () use ($number) {
-            return Http::withHeaders([
-                'x-rapidapi-key' => env('SOCIAL_MEDIA_API_KEY'),
-                'x-rapidapi-host' => env('SOCIAL_MEDIA_API_HOST'),
-            ])->get("https://caller-id-social-search-eyecon.p.rapidapi.com/?phone={$number}")->json();
-        }, 'socialMedia', $number);
+            foreach (array_keys($requests) as $index => $key) {
+                $response = $responses[$index];
 
-        // surepass apis
-        $data['surepassKyc'] = $this->callApiWithCatch(function () use ($localNumber) {
-            return Http::withHeaders([
-                'Content-Type' => 'application/json',
-                // 'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
-                'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
-            ])->post('https://kyc-api.surepass.io/api/v1/prefill/prefill-by-mobile', [
-                'mobile' => $localNumber,
-            ])->json();
-        }, 'surepassKyc', $localNumber);
+                if ($response instanceof \Throwable) {
+                    Log::error("[$key] API Exception", [
+                        'type' => get_class($response),
+                        'message' => $response->getMessage(),
+                    ]);
+                    $data[$key] = null;
+                    continue;
+                }
 
+                try {
+                    if ($response->successful()) {
+                        $json = $response->json();
+                        $data[$key] = $json;
+                    } else {
+                        Log::warning("[$key] API Failed", [
+                            'status' => $response->status(),
+                            'body' => $response->body(),
+                        ]);
+                        $data[$key] = null;
+                    }
+                } catch (\Throwable $e) {
+                    Log::error("[$key] Unexpected error", ['message' => $e->getMessage()]);
+                    $data[$key] = null;
+                }
+            }
 
-        $data['surepassUpi'] = $this->callApiWithCatch(function () use ($localNumber) {
-            return Http::withHeaders([
-                'Content-Type' => 'application/json',
-                'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
-            ])->post('https://kyc-api.surepass.io/api/v1/bank-verification/mobile-to-multiple-upi', [
-                'mobile_number' => $localNumber,
-            ])->json();
-        }, 'surepassUpi', $localNumber);
-
-
-        $data['surepassBank'] = $this->callApiWithCatch(function () use ($localNumber) {
-            return Http::withHeaders([
-                'Content-Type' => 'application/json',
-                'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
-            ])->post('https://kyc-api.surepass.io/api/v1/mobile-to-bank-details/verification', [
-                'mobile_no' => $localNumber,
-            ])->json();
-        }, 'surepassBank', $localNumber);
-
-        // log::info( $data['telegramData']);
-        return response()->json($data);
+            return response()->json($data);
+        } catch (\Exception $e) {
+            Log::error('Global Phone API Error (Caught outside API calls)', [
+                'number' => $request->query('phone'),
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            return response()->json(['error' => 'An internal server error occurred.'], 500);
+        }
     }
 
 
     public function getEmailData(Request $request)
     {
-        $request->validate([
-            'email' => ['required', 'email', 'max:255'],
-        ]);
-
-        $email = $request->query('email');
-
-        $data = [
-            'emailData' => null,
-            'hibpData' => null,
-            'zehefData' => null,
-            'osintData' => null,
-            'holeheData' => null,
-        ];
-
-        // 🔹 Osint API
-        $data['osintData'] = $this->callApiWithCatch(function () use ($email) {
-            return Http::withHeaders([
-                'x-api-key' => env('X_API_KEY'),
-            ])->timeout(60)->get("https://datapool.site/api/search/", [
-                'email' => $email,
-                'per_page' => 50,
-            ])->json();
-        }, 'osint', $email);
-
-        // 🔹 Zehef API
-        $data['zehefData'] = $this->callApiWithCatch(function () use ($email) {
-            return Http::timeout(60) // ⏱ Set BEFORE the request
-                ->post('http://127.0.0.1:5000/api/zehef/', [
-                    'email' => $email,
-                ])
-                ->json();
-        }, 'zehef', $email);
-
-        // 🔹 Holehe API
-        $data['holeheData'] = $this->callApiWithCatch(function () use ($email) {
-            return Http::timeout(60) // ⏱ Set BEFORE the request
-                ->post('http://127.0.0.1:5000/api/holehe/', [
-                    'email' => $email,
-                ])
-                ->json();
-        }, 'holehe', $email);
-
-
-        // 🔹 Google Email API
-        $data['emailData'] = $this->callApiWithCatch(function () use ($email) {
-            return Http::withHeaders([
-                'x-rapidapi-key' => env('EMAIL_API_KEY'),
-                'x-rapidapi-host' => env('EMAIL_API_HOST'),
-            ])->timeout(60)->get("https://google-data.p.rapidapi.com/email/{$email}")->json();
-        }, 'google', $email);
-
-        // 🔹 HIBP API
-        $data['hibpData'] = $this->callApiWithCatch(function () use ($email) {
-            return Http::withHeaders([
-                'hibp-api-key' => env('HIBP_API_KEY'),
-                'User-Agent' => 'LaravelApp/1.0',
-            ])->timeout(60)->get("https://haveibeenpwned.com/api/v3/breachedaccount/{$email}?truncateResponse=false")->json();
-        }, 'hibp', $email);
-
-        // log::info($data['holeheData']);
-        return response()->json($data);
-    }
-
-
-    private function callApiWithCatch(\Closure $callback, string $label, string $input)
-    {
         try {
-            /** @var \Illuminate\Http\Client\Response $response */
-            $response = $callback();
-
-            // Check if the response is a Laravel HTTP client Response object
-            if ($response instanceof \Illuminate\Http\Client\Response) {
-                $status = $response->status();
-                $url = $response->effectiveUri() ?? 'Unknown URL';
-
-                if ($status >= 400) {
-                    // Log error for non-successful HTTP codes
-                    Log::error(strtoupper($label) . " API Error", [
-                        'input' => $input,
-                        'url' => $url,
-                        'status' => $status,
-                        'response' => $response->json(),
-                    ]);
-
-                    return [
-                        'error' => true,
-                        'source' => strtoupper($label),
-                        'status' => $status,
-                        'message' => $response->json()['message'] ?? 'API returned error',
-                    ];
-                }
-
-                // Success — return parsed response body
-                return $response->json();
-            }
-
-            // Fallback if it's already parsed array (not typical, but just in case)
-            return $response;
-        } catch (\Exception $e) {
-            Log::error(strtoupper($label) . " API Exception", [
-                'input' => $input,
-                'error' => $e->getMessage(),
+            $request->validate([
+                'email' => ['required', 'email', 'max:255'],
             ]);
 
-            return [
-                'error' => true,
-                'source' => strtoupper($label),
-                'message' => $e->getMessage(),
+            $email = $request->query('email');
+
+            $urls = [
+                'osint'  => env('OSINTDATA_URL'),
+                'zehef'  => env('ZEHEFDATA_URL'),
+                'holehe' => env('HOLEHEDATA_URL'),
+                'gmail'  => env('EMAILDATA_URL') . "/{$email}",
+                'hibp'   => env('HIBPDATA_URL') . "/{$email}",
             ];
+
+            try {
+                $requests = [
+                    'osintData' => fn($pool) => $pool->withHeaders([
+                        'x-api-key' => env('X_API_KEY'),
+                    ])->timeout(30)->get($urls['osint'], [
+                        'email' => $email,
+                        'per_page' => 50,
+                    ]),
+                    'zehefData' => fn($pool) => $pool->timeout(30)->post($urls['zehef'], ['email' => $email]),
+
+                    'holeheData' => fn($pool) => $pool->timeout(30)->post($urls['holehe'], ['email' => $email]),
+
+                    'emailData' => fn($pool) => $pool->withHeaders([
+                        'x-rapidapi-key' => env('EMAIL_API_KEY'),
+                        'x-rapidapi-host' => env('EMAIL_API_HOST'),
+                    ])->timeout(30)->get($urls['gmail']),
+
+                    'hibpData' => fn($pool) => $pool->withHeaders([
+                        'hibp-api-key' => env('HIBP_API_KEY'),
+                        'User-Agent' => 'LaravelApp/1.0',
+                    ])->timeout(30)->get($urls['hibp'], ['truncateResponse' => 'false']),
+                ];
+                $responses = Http::pool(fn($pool) => array_map(fn($req) => $req($pool), $requests));
+            } catch (\Exception $e) {
+                // This catches other request-related errors (e.g., malformed URL, other Guzzle errors)
+                Log::error('API Pool Request Error', [
+                    'email' => $email,
+                    'message' => $e->getMessage(),
+                ]);
+            }
+            $data = [];
+
+            foreach (array_keys($requests) as $index => $key) {
+                $response = $responses[$index];
+
+                if ($response instanceof \Throwable) {
+                    // Handle exceptions like timeout, DNS failure, etc.
+                    Log::error("[$key] API Exception", [
+                        'type' => get_class($response),
+                        'message' => $response->getMessage(),
+                    ]);
+                    $data[$key] = null;
+                    continue;
+                }
+
+                try {
+                    if ($response->successful()) {
+                        $json = $response->json();
+                        // Log::info("[$key] API Success", ['response' => $json]);
+                        $data[$key] = $json;
+                    } else {
+                        Log::warning("[$key] API Failed", [
+                            'status' => $response->status(),
+                            'body' => $response->body(),
+                        ]);
+                        $data[$key] = null;
+                    }
+                } catch (\Throwable $e) {
+                    Log::error("[$key] Unexpected error", ['message' => $e->getMessage()]);
+                    $data[$key] = null;
+                }
+            }
+            return response()->json($data);
+        } catch (\Exception $e) {
+            // This catches validation errors, or any other unexpected errors outside the API calls
+            Log::error('Global Email API Error (Caught outside API calls)', [
+                'email' => $request->query('email'),
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(), // Add trace for more detail
+            ]);
+            return response()->json(['error' => 'An internal server error occurred.'], 500);
         }
     }
 }
