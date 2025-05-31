@@ -39,10 +39,11 @@ Route::middleware(['auth:sanctum', 'throttle:30,1'])->group(function () {
     // Route::get('/email/{email}', [ApiServiceController::class, 'getEmailData']);
     Route::get('/email', [ApiServiceController::class, 'getEmailData']);
 
-    Route::post('/generate-report',[ReportController::class, 'generateReport']);
+    Route::post('/generate-report', [ReportController::class, 'generateReport']);
+    // Route::post('/generate-ai-report', [ReportController::class, 'generateAiReport']);
+
+    // Route::get('/download-report/{filename}', [ReportController::class, 'downloadReport']);
 });
 
 // googlelogin route
 Route::post('/google-login', [GoogleAuthController::class, 'googleLogin']);
-
-

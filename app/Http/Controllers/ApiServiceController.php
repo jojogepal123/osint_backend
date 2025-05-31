@@ -30,7 +30,7 @@ class ApiServiceController extends Controller
                 'osint'      => env('OSINTDATA_URL'),
                 'truecaller' => env('TRUECALLERDATA_URL'),
                 'whatsapp'   => env('WHATSAPPDATA_URL'),
-                'telegram'   => env('TELEGRAMDATA_URL'),
+                // 'telegram'   => env('TELEGRAMDATA_URL'),
                 'allmobile' => env('ALLMOBILEDATA_URL'),
                 'socialmedia' => env('SOCIALMEDIADATA_URL'),
                 // 'spkyc' => env('SPKYC_URL'),
@@ -57,11 +57,11 @@ class ApiServiceController extends Controller
                         'x-rapidapi-host' => env('TEL_API_HOST'),
                     ])->timeout(30)->get($urls['whatsapp'] . "/{$number}"),
 
-                    'telegramData' => fn($pool) => $pool->withHeaders([
-                        'Content-Type' => 'application/json',
-                    ])->timeout(30)->post($urls['telegram'], [
-                        'phone' => $number,
-                    ]),
+                    // 'telegramData' => fn($pool) => $pool->withHeaders([
+                    //     'Content-Type' => 'application/json',
+                    // ])->timeout(30)->post($urls['telegram'], [
+                    //     'phone' => $number,
+                    // ]),
 
                     'allMobileData' => fn($pool) => $pool->withHeaders([
                         'x-rapidapi-host' => env('ALL_MOBILE_API_HOST'),
