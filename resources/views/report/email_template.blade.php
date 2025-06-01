@@ -10,7 +10,7 @@
 <body class="bg-gray-900 text-white p-6">
     <h1 class="text-2xl font-bold text-lime-400 mb-6">Email OSINT Report</h1>
 
-    < class="section-profile">
+    <div class="section-profile">
         @php $profile = $data['profile'] ?? []; @endphp
 
         {{-- Profile Images --}}
@@ -262,7 +262,7 @@
             @endforeach
         @endif
 
-        </div>
+    </div>
 </body>
 
 </html>
