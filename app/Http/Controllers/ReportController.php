@@ -7,10 +7,9 @@ use Illuminate\Support\Facades\View;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Log;
-
+use Illuminate\Support\Facades\Storage;
 class ReportController extends Controller
 {
-
     public function generateReport(Request $request)
     {
         $validated = $request->validate([
@@ -18,6 +17,7 @@ class ReportController extends Controller
             'userInput' => ['required', 'string'],
             'results' => ['required', 'array'],
         ]);
+
         $data = $validated['results'];
         $type = $validated['type'];
         $userInput = $validated['userInput'];
@@ -25,22 +25,59 @@ class ReportController extends Controller
         $filename = 'report_' . now()->format('Ymd_His') . '_' . Str::uuid() . '.pdf';
         $filePath = storage_path("app/private/reports/{$filename}");
 
+        // Ensure directory exists
+        Storage::makeDirectory('/reports');
+
+        // Render view based on type
         if ($type === 'tel') {
-            // Render the Blade view to HTML
             $html = View::make('report.tel_template', compact('data'))->render();
         } else if ($type === 'email') {
-            // Render the Blade view to HTML
             $html = View::make('report.email_template', compact('data'))->render();
         } else {
-            Log::error("error occeured");
+            Log::error("Invalid report type: $type");
+            return response()->json(['error' => 'Invalid type'], 422);
         }
-        // Generate PDF from HTML
-        $pdf = Pdf::loadHTML($html);
-        // Save PDF to storage
-        $pdf->save($filePath);
-        // Optionally return download
-        return response()->download($filePath, $filename);
+
+        try {
+            $pdf = Pdf::loadHTML($html);
+            $pdf->save($filePath);
+            return response()->download($filePath, $filename);
+        } catch (\Exception $e) {
+            Log::error("PDF generation failed: " . $e->getMessage());
+            return response()->json(['error' => 'PDF generation failed'], 500);
+        }
     }
+    // public function generateReport(Request $request)
+    // {
+    //     $validated = $request->validate([
+    //         'type' => ['required', 'in:tel,email'],
+    //         'userInput' => ['required', 'string'],
+    //         'results' => ['required', 'array'],
+    //     ]);
+    //     $data = $validated['results'];
+    //     $type = $validated['type'];
+    //     $userInput = $validated['userInput'];
+
+    //     $filename = 'report_' . now()->format('Ymd_His') . '_' . Str::uuid() . '.pdf';
+    //     $filePath = storage_path("app/private/reports/{$filename}");
+
+
+    //     if ($type === 'tel') {
+    //         // Render the Blade view to HTML
+    //         $html = View::make('report.tel_template', compact('data'))->render();
+    //     } else if ($type === 'email') {
+    //         // Render the Blade view to HTML
+    //         $html = View::make('report.email_template', compact('data'))->render();
+    //     } else {
+    //         Log::error("error occeured");
+    //     }
+    //     // Generate PDF from HTML
+    //     $pdf = Pdf::loadHTML($html);
+    //     // Save PDF to storage
+    //     $pdf->save($filePath);
+    //     // Optionally return download
+    //     return response()->download($filePath, $filename);
+    // }
 
     // public function generateAiReport(Request $request)
     // {
