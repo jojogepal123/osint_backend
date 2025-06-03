@@ -8,8 +8,19 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+
 class ReportController extends Controller
 {
+    private function getImageBase64($url)
+    {
+        try {
+            $imgData = file_get_contents($url);
+            $type = pathinfo($url, PATHINFO_EXTENSION);
+            return 'data:image/' . $type . ';base64,' . base64_encode($imgData);
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
     public function generateReport(Request $request)
     {
         $validated = $request->validate([
@@ -32,6 +43,13 @@ class ReportController extends Controller
         if ($type === 'tel') {
             $html = View::make('report.tel_template', compact('data'))->render();
         } else if ($type === 'email') {
+            if (!empty($data['breachData'])) {
+                foreach ($data['breachData'] as $key => $value) {
+                    if (!empty($value['LogoPath'])) {
+                        $data['breachData'][$key]['LogoBase64'] = $this->getImageBase64($value['LogoPath']);
+                    }
+                }
+            }
             $html = View::make('report.email_template', compact('data'))->render();
         } else {
             Log::error("Invalid report type: $type");
@@ -47,6 +65,7 @@ class ReportController extends Controller
             return response()->json(['error' => 'PDF generation failed'], 500);
         }
     }
+
     // public function generateReport(Request $request)
     // {
     //     $validated = $request->validate([
