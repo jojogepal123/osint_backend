@@ -27,13 +27,13 @@ class ApiServiceController extends Controller
             $localNumber = preg_replace('/^91/', '', $number); // for India
 
             $urls = [
-                'osint'      => env('OSINTDATA_URL'),
+                'osint' => env('OSINTDATA_URL'),
                 'truecaller' => env('TRUECALLERDATA_URL'),
-                'whatsapp'   => env('WHATSAPPDATA_URL'),
+                'whatsapp' => env('WHATSAPPDATA_URL'),
                 // 'telegram'   => env('TELEGRAMDATA_URL'),
                 'allmobile' => env('ALLMOBILEDATA_URL'),
                 'socialmedia' => env('SOCIALMEDIADATA_URL'),
-                // 'spkyc' => env('SPKYC_URL'),
+                'spkyc' => env('SPKYC_URL'),
                 // 'spupi' => env('SPUPI_URL'),
                 // 'spbank' => env('SPBANK_URL'),
             ];
@@ -43,9 +43,9 @@ class ApiServiceController extends Controller
                     'osintData' => fn($pool) => $pool->withHeaders([
                         'x-api-key' => env('X_API_KEY'),
                     ])->timeout(30)->get($urls['osint'], [
-                        'phone' => $number,
-                        'per_page' => 50,
-                    ]),
+                                'phone' => $number,
+                                'per_page' => 50,
+                            ]),
 
                     'truecallerData' => fn($pool) => $pool->withHeaders([
                         'x-rapidapi-key' => env('TRUECALLER_API_KEY'),
@@ -73,12 +73,12 @@ class ApiServiceController extends Controller
                         'x-rapidapi-host' => env('SOCIAL_MEDIA_API_HOST'),
                     ])->timeout(30)->get($urls['socialmedia'] . "/?phone={$number}"),
 
-                    // 'surepassKyc' => fn($pool) => $pool->withHeaders([
-                    //     'Content-Type' => 'application/json',
-                    //     'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
-                    // ])->timeout(30)->post($urls['spkyc'], [
-                    //     'mobile' => $localNumber,
-                    // ]),
+                    'surepassKyc' => fn($pool) => $pool->withHeaders([
+                        'Content-Type' => 'application/json',
+                        'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
+                    ])->timeout(30)->post($urls['spkyc'], [
+                                'mobile' => $localNumber,
+                            ]),
 
                     // 'surepassUpi' => fn($pool) => $pool->withHeaders([
                     //     'Content-Type' => 'application/json',
@@ -177,11 +177,11 @@ class ApiServiceController extends Controller
             $email = $request->query('email');
 
             $urls = [
-                'osint'  => env('OSINTDATA_URL'),
-                'zehef'  => env('ZEHEFDATA_URL'),
+                'osint' => env('OSINTDATA_URL'),
+                'zehef' => env('ZEHEFDATA_URL'),
                 'holehe' => env('HOLEHEDATA_URL'),
-                'gmail'  => env('EMAILDATA_URL') . "/{$email}",
-                'hibp'   => env('HIBPDATA_URL') . "/{$email}",
+                'gmail' => env('EMAILDATA_URL') . "/{$email}",
+                'hibp' => env('HIBPDATA_URL') . "/{$email}",
             ];
 
             try {
@@ -189,9 +189,9 @@ class ApiServiceController extends Controller
                     'osintData' => fn($pool) => $pool->withHeaders([
                         'x-api-key' => env('X_API_KEY'),
                     ])->timeout(30)->get($urls['osint'], [
-                        'email' => $email,
-                        'per_page' => 50,
-                    ]),
+                                'email' => $email,
+                                'per_page' => 50,
+                            ]),
                     'zehefData' => fn($pool) => $pool->timeout(30)->post($urls['zehef'], ['email' => $email]),
 
                     'holeheData' => fn($pool) => $pool->timeout(30)->post($urls['holehe'], ['email' => $email]),
