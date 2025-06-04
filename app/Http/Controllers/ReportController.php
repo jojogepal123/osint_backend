@@ -77,7 +77,7 @@ class ReportController extends Controller
         try {
             $response = Http::withHeaders([
                 'Content-Type' => 'application/json',
-                'Authorization' => 'Bearer ' . env('SUREPASS_API_TOKEN'),
+                'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
             ])->post(env('CREDITREPORT_URL'), [
                         'name' => $request->input('name'),
                         'id_number' => $request->input('id_number'),

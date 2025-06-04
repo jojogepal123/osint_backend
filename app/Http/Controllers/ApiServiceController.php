@@ -33,7 +33,7 @@ class ApiServiceController extends Controller
                 // 'telegram'   => env('TELEGRAMDATA_URL'),
                 'allmobile' => env('ALLMOBILEDATA_URL'),
                 'socialmedia' => env('SOCIALMEDIADATA_URL'),
-                'spkyc' => env('SPKYC_URL'),
+                // 'spkyc' => env('SPKYC_URL'),
                 // 'spupi' => env('SPUPI_URL'),
                 // 'spbank' => env('SPBANK_URL'),
             ];
@@ -73,12 +73,12 @@ class ApiServiceController extends Controller
                         'x-rapidapi-host' => env('SOCIAL_MEDIA_API_HOST'),
                     ])->timeout(30)->get($urls['socialmedia'] . "/?phone={$number}"),
 
-                    'surepassKyc' => fn($pool) => $pool->withHeaders([
-                        'Content-Type' => 'application/json',
-                        'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
-                    ])->timeout(30)->post($urls['spkyc'], [
-                                'mobile' => $localNumber,
-                            ]),
+                    // 'surepassKyc' => fn($pool) => $pool->withHeaders([
+                    //     'Content-Type' => 'application/json',
+                    //     'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
+                    // ])->timeout(30)->post($urls['spkyc'], [
+                    //     'mobile' => $localNumber,
+                    // ]),
 
                     // 'surepassUpi' => fn($pool) => $pool->withHeaders([
                     //     'Content-Type' => 'application/json',
