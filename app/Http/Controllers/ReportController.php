@@ -66,106 +66,75 @@ class ReportController extends Controller
             return response()->json(['error' => 'PDF generation failed'], 500);
         }
     }
-    public function generate(Request $request)
-    {
-        $request->validate([
-            'name' => 'required|string',
-            'id_number' => 'required|string',
-            'mobile' => 'required|string',
-        ]);
-
-        try {
-            $response = Http::withHeaders([
-                'Content-Type' => 'application/json',
-                'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
-            ])->post(env('CREDITREPORT_URL'), [
-                        'name' => $request->input('name'),
-                        'id_number' => $request->input('id_number'),
-                        'id_type' => 'pan', // hardcoded as per your requirement
-                        'mobile' => $request->input('mobile'),
-                        'consent' => 'Y',
-                    ]);
-
-            if ($response->successful()) {
-                $data = $response->json();
-
-                // Check if credit_report_link exists in response data
-                if (isset($data['data']['credit_report_link'])) {
-                    $pdfUrl = $data['data']['credit_report_link'];
-
-                    // Fetch the PDF file content from the URL
-                    $pdfResponse = Http::get($pdfUrl);
-
-                    if ($pdfResponse->successful()) {
-                        $pdfContent = $pdfResponse->body();
-
-                        // Return the PDF file as a response with proper headers for download
-                        return response($pdfContent, 200)
-                            ->header('Content-Type', 'application/pdf')
-                            ->header('Content-Disposition', 'attachment; filename="credit-report.pdf"');
-                    } else {
-                        Log::error('Failed to fetch PDF from link', ['status' => $pdfResponse->status()]);
-                        return response()->json([
-                            'message' => 'Failed to fetch credit report PDF.',
-                        ], 500);
-                    }
-                } else {
-                    Log::error('credit_report_link not found in API response', ['response' => $data]);
-                    return response()->json([
-                        'message' => 'Credit report link missing in response.',
-                    ], 500);
-                }
-            } else {
-                Log::warning('Credit report API returned error', [
-                    'status' => $response->status(),
-                    'body' => $response->body(),
-                ]);
-                return response()->json([
-                    'message' => 'Failed to fetch credit report',
-                    'error' => $response->json(),
-                ], $response->status());
-            }
-        } catch (\Exception $e) {
-            Log::error('Exception while fetching credit report', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-            ]);
-            return response()->json([
-                'message' => 'An error occurred while processing the request.',
-                'error' => $e->getMessage(),
-            ], 500);
-        }
-    }
-    // public function generateReport(Request $request)
+    // public function generate(Request $request)
     // {
-    //     $validated = $request->validate([
-    //         'type' => ['required', 'in:tel,email'],
-    //         'userInput' => ['required', 'string'],
-    //         'results' => ['required', 'array'],
+    //     $request->validate([
+    //         'name' => 'required|string',
+    //         'id_number' => 'required|string',
+    //         'mobile' => 'required|string',
     //     ]);
-    //     $data = $validated['results'];
-    //     $type = $validated['type'];
-    //     $userInput = $validated['userInput'];
 
-    //     $filename = 'report_' . now()->format('Ymd_His') . '_' . Str::uuid() . '.pdf';
-    //     $filePath = storage_path("app/private/reports/{$filename}");
+    //     try {
+    //         $response = Http::withHeaders([
+    //             'Content-Type' => 'application/json',
+    //             'Authorization' => 'Bearer ' . env('SUREPASS_API_TOKEN'),
+    //         ])->post(env('CREDITREPORT_URL'), [
+    //                     'name' => $request->input('name'),
+    //                     'id_number' => $request->input('id_number'),
+    //                     'id_type' => 'pan', // hardcoded as per your requirement
+    //                     'mobile' => $request->input('mobile'),
+    //                     'consent' => 'Y',
+    //                 ]);
 
+    //         if ($response->successful()) {
+    //             $data = $response->json();
 
-    //     if ($type === 'tel') {
-    //         // Render the Blade view to HTML
-    //         $html = View::make('report.tel_template', compact('data'))->render();
-    //     } else if ($type === 'email') {
-    //         // Render the Blade view to HTML
-    //         $html = View::make('report.email_template', compact('data'))->render();
-    //     } else {
-    //         Log::error("error occeured");
+    //             // Check if credit_report_link exists in response data
+    //             if (isset($data['data']['credit_report_link'])) {
+    //                 $pdfUrl = $data['data']['credit_report_link'];
+
+    //                 // Fetch the PDF file content from the URL
+    //                 $pdfResponse = Http::get($pdfUrl);
+
+    //                 if ($pdfResponse->successful()) {
+    //                     $pdfContent = $pdfResponse->body();
+
+    //                     // Return the PDF file as a response with proper headers for download
+    //                     return response($pdfContent, 200)
+    //                         ->header('Content-Type', 'application/pdf')
+    //                         ->header('Content-Disposition', 'attachment; filename="credit-report.pdf"');
+    //                 } else {
+    //                     Log::error('Failed to fetch PDF from link', ['status' => $pdfResponse->status()]);
+    //                     return response()->json([
+    //                         'message' => 'Failed to fetch credit report PDF.',
+    //                     ], 500);
+    //                 }
+    //             } else {
+    //                 Log::error('credit_report_link not found in API response', ['response' => $data]);
+    //                 return response()->json([
+    //                     'message' => 'Credit report link missing in response.',
+    //                 ], 500);
+    //             }
+    //         } else {
+    //             Log::warning('Credit report API returned error', [
+    //                 'status' => $response->status(),
+    //                 'body' => $response->body(),
+    //             ]);
+    //             return response()->json([
+    //                 'message' => 'Failed to fetch credit report',
+    //                 'error' => $response->json(),
+    //             ], $response->status());
+    //         }
+    //     } catch (\Exception $e) {
+    //         Log::error('Exception while fetching credit report', [
+    //             'error' => $e->getMessage(),
+    //             'trace' => $e->getTraceAsString(),
+    //         ]);
+    //         return response()->json([
+    //             'message' => 'An error occurred while processing the request.',
+    //             'error' => $e->getMessage(),
+    //         ], 500);
     //     }
-    //     // Generate PDF from HTML
-    //     $pdf = Pdf::loadHTML($html);
-    //     // Save PDF to storage
-    //     $pdf->save($filePath);
-    //     // Optionally return download
-    //     return response()->download($filePath, $filename);
     // }
 
     // public function generateAiReport(Request $request)
