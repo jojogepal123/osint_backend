@@ -97,7 +97,7 @@
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
             gap: 8px;
-            background-color: #2d3748;
+            background-color:  #1a202c;
             margin-top: 8px;
             padding: 8px;
         }
@@ -167,7 +167,7 @@
             <ul class="grid">
                 @foreach($profile['socialMediaPresence'] as $platform => $status)
                     <li class="grid-item">
-                        <span class="capitalize">{{ $platform }}</span>
+                        <span class="capitalize">{{ $platform }} : </span>
                         <span class="{{ $status ? 'status-active' : 'status-inactive' }}">
                             {{ is_bool($status) ? ($status ? 'Active' : 'Inactive') : 'Active' }}
                         </span>
