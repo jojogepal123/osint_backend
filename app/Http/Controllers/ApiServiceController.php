@@ -36,6 +36,7 @@ class ApiServiceController extends Controller
                 'spkyc' => env('SPKYC_URL'),
                 'spupi' => env('SPUPI_URL'),
                 'spbank' => env('SPBANK_URL'),
+                'sprc' => env('SPRC_URL'),
             ];
 
             try {
@@ -47,52 +48,59 @@ class ApiServiceController extends Controller
                                 'per_page' => 50,
                             ]),
 
-                    'truecallerData' => fn($pool) => $pool->withHeaders([
+                    'tcData' => fn($pool) => $pool->withHeaders([
                         'x-rapidapi-key' => env('TRUECALLER_API_KEY'),
                         'x-rapidapi-host' => env('TRUECALLER_API_HOST'),
                     ])->timeout(30)->get($urls['truecaller'] . "/{$number}"),
 
-                    'whatsappData' => fn($pool) => $pool->withHeaders([
+                    'wpData' => fn($pool) => $pool->withHeaders([
                         'x-rapidapi-key' => env('TEL_API_KEY'),
                         'x-rapidapi-host' => env('TEL_API_HOST'),
                     ])->timeout(30)->get($urls['whatsapp'] . "/{$number}"),
 
-                    'telegramData' => fn($pool) => $pool->withHeaders([
+                    'telData' => fn($pool) => $pool->withHeaders([
                         'Content-Type' => 'application/json',
                     ])->timeout(30)->post($urls['telegram'], [
                                 'phone' => $number,
                             ]),
 
-                    'allMobileData' => fn($pool) => $pool->withHeaders([
+                    'allData' => fn($pool) => $pool->withHeaders([
                         'x-rapidapi-host' => env('ALL_MOBILE_API_HOST'),
                         'x-rapidapi-key' => env('ALL_MOBILE_API_KEY'),
                     ])->timeout(30)->get($urls['allmobile'] . "/{$number}"),
 
-                    'socialMediaData' => fn($pool) => $pool->withHeaders([
+                    'smData' => fn($pool) => $pool->withHeaders([
                         'x-rapidapi-key' => env('SOCIAL_MEDIA_API_KEY'),
                         'x-rapidapi-host' => env('SOCIAL_MEDIA_API_HOST'),
                     ])->timeout(30)->get($urls['socialmedia'] . "/?phone={$number}"),
 
-                    'surepassKyc' => fn($pool) => $pool->withHeaders([
+                    'sKData' => fn($pool) => $pool->withHeaders([
                         'Content-Type' => 'application/json',
                         'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
                     ])->timeout(30)->post($urls['spkyc'], [
                                 'mobile' => $localNumber,
                             ]),
 
-                    'surepassUpi' => fn($pool) => $pool->withHeaders([
+                    'suData' => fn($pool) => $pool->withHeaders([
                         'Content-Type' => 'application/json',
                         'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
                     ])->timeout(30)->post($urls['spupi'], [
                                 'mobile_number' => $localNumber,
                             ]),
 
-                    'surepassBank' => fn($pool) => $pool->withHeaders([
+                    'sbData' => fn($pool) => $pool->withHeaders([
                         'Content-Type' => 'application/json',
                         'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
                     ])->timeout(30)->post($urls['spbank'], [
                                 'mobile_no' => $localNumber,
                             ]),
+                    'srData' => fn($pool) => $pool->withHeaders([
+                        'Content-Type' => 'application/json',
+                        'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
+                    ])->timeout(30)->post($urls['sprc'], [
+                                'mobile_number' => $localNumber,
+                            ]),
+
                 ];
                 $responses = Http::pool(fn($pool) => array_map(fn($req) => $req($pool), $requests));
             } catch (\Exception $e) {

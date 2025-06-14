@@ -121,96 +121,87 @@
     <div class="section">
       <h2>Profile Images</h2>
       <div class="profile-images">
-        @foreach($profile['profileImages'] as $img)
-        <div class="image-box">
-          <img src="{{ $img['value'] }}" alt="Profile Image">
-          @if(!empty($img['source']))
-          <p class="source-label">(Source: {{ $img['source'] }})</p>
-          @endif
-        </div>
-        @endforeach
+      @foreach($profile['profileImages'] as $img)
+      <div class="image-box">
+        <img src="{{ $img['value'] }}" alt="Profile Image">
+        @if(!empty($img['source']))
+      <p class="source-label">(Source: {{ $img['source'] }})</p>
+      @endif
+      </div>
+    @endforeach
       </div>
     </div>
-    @endif
+  @endif
 
-    @foreach ([
-      'fullNames' => 'Full Names',
-      'userNames' => 'Usernames',
-      'emails' => 'Emails',
-      'phones' => 'Phone Numbers',
-      'locations' => 'Locations',
-      'lastUpdated' => 'Last Updated',
-      'basicInfo' => 'Basic Info',
-      'bankDetails' => 'Bank Details',
-      'upiDetails' => 'UPI Details',
-      'idProofs' => 'ID Proofs'
-    ] as $field => $title)
+    @foreach (['fullNames' => 'Full Names', 'userNames' => 'Usernames', 'emails' => 'Emails', 'phones' => 'Phone Numbers', 'locations' => 'Locations', 'lastUpdated' => 'Last Updated', 'basicInfo' => 'Basic Info', 'bankDetails' => 'Bank Details', 'upiDetails' => 'UPI Details', 'idProofs' => 'ID Proofs', 'rcNumber' => 'RC Number',] as $field => $title)
       @if(!empty($profile[$field]))
       <div class="section">
         <h2>{{ $title }}</h2>
         <ul>
-          @foreach($profile[$field] as $item)
-          <li>
-            {{ $item['value'] ?? 'N/A' }}
-            @if(!empty($item['source']))
-            <span class="text-xs text-gray">(Source: {{ $item['source'] }})</span>
-            @endif
-          </li>
-          @endforeach
+        @foreach($profile[$field] as $item)
+        <!-- <li>
+        {{ $item['value'] ?? 'N/A' }}
+        @if(!empty($item['source']))
+        <span class="text-xs text-gray">(Source: {{ $item['source'] }})</span>
+        @endif
+        </li> -->
+        <li>
+        {{ is_array($item) ? ($item['value'] ?? 'N/A') : $item }}
+        @if(!empty($item['source']))
+        <span class="text-xs text-gray">(Source: {{ $item['source'] }})</span>
+        @endif
+        </li>
+      @endforeach
         </ul>
       </div>
       @endif
-    @endforeach
+  @endforeach
 
-    @foreach ([
-      'numberIsActivate' => 'Number Is Activate',
-      'isSpam' => 'Is Spam',
-      'isBusiness' => 'Is Business'
-    ] as $field => $title)
+    @foreach (['numberIsActivate' => 'Number Is Activate', 'isSpam' => 'Is Spam', 'isBusiness' => 'Is Business'] as $field => $title)
       @if(isset($profile[$field]))
       <div class="section">
         <h2>{{ $title }}</h2>
         <div>
-          {{ $profile[$field] ? 'Yes' : 'No' }}
+        {{ $profile[$field] ? 'Yes' : 'No' }}
         </div>
       </div>
       @endif
-    @endforeach
+  @endforeach
 
     @if(!empty($profile['socialMediaPresence']))
     <div class="section">
       <h2>Social Media Presence</h2>
       <ul>
-        @foreach($profile['socialMediaPresence'] as $platform => $status)
-        <li class="font-semibold">
-          <span class="capitalize">{{ $platform }}:</span>
-          <span class="{{ $status ? 'text-green' : 'text-red' }}">
-            {{ is_bool($status) ? ($status ? 'Yes' : 'No') : $status }}
-          </span>
-        </li>
-        @endforeach
+      @foreach($profile['socialMediaPresence'] as $platform => $status)
+      <li class="font-semibold">
+      <span class="capitalize">{{ $platform }}:</span>
+      <span class="{{ $status ? 'text-green' : 'text-red' }}">
+      {{ is_bool($status) ? ($status ? 'Yes' : 'No') : $status }}
+      </span>
+      </li>
+    @endforeach
       </ul>
     </div>
-    @endif
+  @endif
 
     @if(!empty($data['osintData']))
     <div class="section">
       <h2>OSINT Data</h2>
       @foreach($data['osintData'] as $key => $value)
       <div class="bg-dark p-3 rounded shadow section">
-        @if(is_array($value))
-        @foreach($value as $subKey => $subValue)
-        <div>
-          {{ $subKey }}: {{ is_array($subValue) ? implode(', ', $subValue) : $subValue }}
-        </div>
-        @endforeach
-        @else
-        <div>{{ $value }}</div>
-        @endif
+      @if(is_array($value))
+      @foreach($value as $subKey => $subValue)
+      <div>
+      {{ $subKey }}: {{ is_array($subValue) ? implode(', ', $subValue) : $subValue }}
       </div>
       @endforeach
-    </div>
+    @else
+      <div>{{ $value }}</div>
     @endif
+      </div>
+    @endforeach
+    </div>
+  @endif
 
   </div>
 </body>

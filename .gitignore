@@ -22,3 +22,4 @@ yarn-error.log
 /.vscode
 /.zed
 app/Http/Controllers/apiservicecontrollerdev.php
+config/cors.php
