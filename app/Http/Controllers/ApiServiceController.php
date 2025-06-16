@@ -31,7 +31,7 @@ class ApiServiceController extends Controller
                 'truecaller' => env('TRUECALLERDATA_URL'),
                 'whatsapp' => env('WHATSAPPDATA_URL'),
                 'telegram' => env('TELEGRAMDATA_URL'),
-                'allmobile' => env('ALLMOBILEDATA_URL'),
+                // 'allmobile' => env('ALLMOBILEDATA_URL'),
                 'socialmedia' => env('SOCIALMEDIADATA_URL'),
                 'spkyc' => env('SPKYC_URL'),
                 'spupi' => env('SPUPI_URL'),
@@ -64,10 +64,10 @@ class ApiServiceController extends Controller
                                 'phone' => $number,
                             ]),
 
-                    'allData' => fn($pool) => $pool->withHeaders([
-                        'x-rapidapi-host' => env('ALL_MOBILE_API_HOST'),
-                        'x-rapidapi-key' => env('ALL_MOBILE_API_KEY'),
-                    ])->timeout(30)->get($urls['allmobile'] . "/{$number}"),
+                    // 'allData' => fn($pool) => $pool->withHeaders([
+                    //     'x-rapidapi-host' => env('ALL_MOBILE_API_HOST'),
+                    //     'x-rapidapi-key' => env('ALL_MOBILE_API_KEY'),
+                    // ])->timeout(30)->get($urls['allmobile'] . "/{$number}"),
 
                     'smData' => fn($pool) => $pool->withHeaders([
                         'x-rapidapi-key' => env('SOCIAL_MEDIA_API_KEY'),
@@ -75,12 +75,10 @@ class ApiServiceController extends Controller
                     ])->timeout(30)->get($urls['socialmedia'] . "/?phone={$number}"),
 
                     'sKData' => fn($pool) => $pool->withHeaders([
-                        'Content-Type' => 'application/json',
                         'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
-                    ])->timeout(30)->post($urls['spkyc'], [
+                    ])->asJson()->timeout(30)->post($urls['spkyc'], [
                                 'mobile' => $localNumber,
                             ]),
-
                     'suData' => fn($pool) => $pool->withHeaders([
                         'Content-Type' => 'application/json',
                         'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
