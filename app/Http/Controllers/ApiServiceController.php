@@ -75,8 +75,9 @@ class ApiServiceController extends Controller
                     ])->timeout(30)->get($urls['socialmedia'] . "/?phone={$number}"),
 
                     'sKData' => fn($pool) => $pool->withHeaders([
+                        'Content-Type' => 'application/json',
                         'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
-                    ])->asJson()->timeout(30)->post($urls['spkyc'], [
+                    ])->timeout(30)->post($urls['spkyc'], [
                                 'mobile' => $localNumber,
                             ]),
                     'suData' => fn($pool) => $pool->withHeaders([
@@ -160,7 +161,7 @@ class ApiServiceController extends Controller
                     $data[$key] = null;
                 }
             }
-
+            
             return response()->json($data);
         } catch (\Exception $e) {
             Log::error('Global Phone API Error (Caught outside API calls)', [
