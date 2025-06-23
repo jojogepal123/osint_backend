@@ -8,6 +8,7 @@ use App\Http\Controllers\Auth\VerifyEmailController;
 use App\Http\Controllers\GoogleAuthController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ReportController;
+use App\Http\Controllers\CashfreeSubscriptionController;
 
 
 
@@ -46,6 +47,11 @@ Route::middleware(['auth:sanctum', 'throttle:30,1'])->group(function () {
 
     // Route::get('/download-report/{filename}', [ReportController::class, 'downloadReport']);
 });
+
+
+
+Route::middleware('auth:sanctum')->post('/cashfree/create-order', [CashfreeSubscriptionController::class, 'createOrder']);
+Route::post('/cashfree/webhook', [CashfreeSubscriptionController::class, 'webhook']);
 
 
 // googlelogin route

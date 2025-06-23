@@ -133,7 +133,7 @@
     </div>
   @endif
 
-    @foreach (['fullNames' => 'Full Names', 'userNames' => 'Usernames', 'emails' => 'Emails', 'phones' => 'Phone Numbers', 'locations' => 'Locations', 'lastUpdated' => 'Last Updated', 'basicInfo' => 'Basic Info', 'bankDetails' => 'Bank Details', 'upiDetails' => 'UPI Details', 'idProofs' => 'ID Proofs', 'rcNumber' => 'RC Number',] as $field => $title)
+    @foreach (['fullNames' => 'Full Names', 'userNames' => 'Usernames', 'emails' => 'Emails', 'phones' => 'Phone Numbers', 'locations' => 'Locations', 'verifiedAddress' => 'Verified Address', 'lastUpdated' => 'Last Updated', 'basicInfo' => 'Basic Info', 'bankDetails' => 'Bank Details', 'upiDetails' => 'UPI Details', 'idProofs' => 'ID Proofs', 'rcNumber' => 'RC Number',] as $field => $title)
       @if(!empty($profile[$field]))
       <div class="section">
         <h2>{{ $title }}</h2>
