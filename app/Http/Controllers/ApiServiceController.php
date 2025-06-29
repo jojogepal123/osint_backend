@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use HlrLookup\HLRLookupClient;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Arr;
 use Illuminate\Http\Client\ConnectionException;
 use GuzzleHttp\Exception\RequestException; // Import this
 
@@ -64,6 +65,11 @@ class ApiServiceController extends Controller
                     // ])->timeout(30)->post($urls['telegram'], [
                     //             'phone' => $number,
                     //         ]),
+                    'telData' => fn($pool) => $pool->withHeaders([
+                        'Content-Type' => 'application/json',
+                    ])->timeout(30)->post($urls['telegram'], [
+                                'phone' => $number,
+                            ]),
 
                     // 'allData' => fn($pool) => $pool->withHeaders([
                     //     'x-rapidapi-host' => env('ALL_MOBILE_API_HOST'),
@@ -86,6 +92,17 @@ class ApiServiceController extends Controller
                     // ])->timeout(30)->post($urls['spupi'], [
                     //             'mobile_number' => $localNumber,
                     //         ]),
+                    'sKData' => fn($pool) => $pool->withHeaders([
+                        'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
+                    ])->asJson()->timeout(30)->post($urls['spkyc'], [
+                                'mobile' => $localNumber,
+                            ]),
+                    'suData' => fn($pool) => $pool->withHeaders([
+                        'Content-Type' => 'application/json',
+                        'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
+                    ])->timeout(30)->post($urls['spupi'], [
+                                'mobile_number' => $localNumber,
+                            ]),
 
                     // 'sbData' => fn($pool) => $pool->withHeaders([
                     //     'Content-Type' => 'application/json',
@@ -99,6 +116,18 @@ class ApiServiceController extends Controller
                     // ])->timeout(30)->post($urls['sprc'], [
                     //             'mobile_number' => $localNumber,
                     //         ]),
+                    'sbData' => fn($pool) => $pool->withHeaders([
+                        'Content-Type' => 'application/json',
+                        'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
+                    ])->timeout(30)->post($urls['spbank'], [
+                                'mobile_no' => $localNumber,
+                            ]),
+                    'srData' => fn($pool) => $pool->withHeaders([
+                        'Content-Type' => 'application/json',
+                        'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
+                    ])->timeout(30)->post($urls['sprc'], [
+                                'mobile_number' => $localNumber,
+                            ]),
 
                 ];
                 $responses = Http::pool(fn($pool) => array_map(fn($req) => $req($pool), $requests));
@@ -187,7 +216,7 @@ class ApiServiceController extends Controller
                 'osint' => env('OSINTDATA_URL'),
                 'zehef' => env('ZEHEFDATA_URL'),
                 'holehe' => env('HOLEHEDATA_URL'),
-                'gmail' => env('EMAILDATA_URL') . "/{$email}",
+                'gmail' => env('EMAILDATA_URL'),
                 'hibp' => env('HIBPDATA_URL') . "/{$email}",
             ];
 
@@ -203,10 +232,7 @@ class ApiServiceController extends Controller
 
                     'holeheData' => fn($pool) => $pool->timeout(30)->post($urls['holehe'], ['email' => $email]),
 
-                    'emailData' => fn($pool) => $pool->withHeaders([
-                        'x-rapidapi-key' => env('EMAIL_API_KEY'),
-                        'x-rapidapi-host' => env('EMAIL_API_HOST'),
-                    ])->timeout(30)->get($urls['gmail']),
+                    'emailData' => fn($pool) => $pool->timeout(30)->asJson()->post($urls['gmail'], ['email' => $email]),
 
                     'hibpData' => fn($pool) => $pool->withHeaders([
                         'hibp-api-key' => env('HIBP_API_KEY'),
@@ -240,7 +266,18 @@ class ApiServiceController extends Controller
                     if ($response->successful()) {
                         $json = $response->json();
                         // Log::info("[$key] API Success", ['response' => $json]);
-                        $data[$key] = $json;
+                        if ($key === 'emailData') {
+                            // Flatten "data" into root
+                            if (isset($json['data']) && is_array($json['data'])) {
+                                // Merge data into root
+                                $flattened = array_merge($json['data'], Arr::except($json, ['data']));
+                                $data[$key] = $flattened;
+                            } else {
+                                $data[$key] = $json;
+                            }
+                        } else {
+                            $data[$key] = $json;
+                        }
                     } else {
                         Log::warning("[$key] API Failed", [
                             'status' => $response->status(),
