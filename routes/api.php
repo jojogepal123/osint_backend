@@ -15,7 +15,7 @@ use App\Http\Controllers\CashfreeSubscriptionController;
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
 
-Route::middleware('auth:sanctum')->post('/logout', [AuthController::class, 'logout']);
+
 
 Route::middleware(['auth'])->group(function () {
     Route::post('/email/verification-notification', [EmailVerificationNotificationController::class, 'store'])
@@ -28,12 +28,16 @@ Route::get('/verify-email/{id}/{hash}', VerifyEmailController::class)
     ->name('verification.verify');
 
 // AUTHENTICATED USER DATA
-Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
+Route::middleware(['auth:sanctum', 'token.expire'])->get('/user', function (Request $request) {
     return $request->user();
 });
 
+Route::middleware(['auth:sanctum', 'token.expire'])->post('/logout', [AuthController::class, 'logout']);
+Route::middleware(['auth:sanctum', 'token.expire'])->post('/cashfree/create-order', [CashfreeSubscriptionController::class, 'createOrder']);
+
+
 // API SERVICE ROUTES (Secured with `auth:sanctum` & Rate Limiting)
-Route::middleware(['auth:sanctum', 'throttle:30,1'])->group(function () {
+Route::middleware(['auth:sanctum', 'token.expire', 'throttle:30,1'])->group(function () {
     // Route::get('/tel/{number}', [ApiServiceController::class, 'getTelData']);
 
     Route::get('/tel', [ApiServiceController::class, 'getTelData']);
@@ -50,8 +54,7 @@ Route::middleware(['auth:sanctum', 'throttle:30,1'])->group(function () {
 
 
 
-Route::middleware('auth:sanctum')->post('/cashfree/create-order', [CashfreeSubscriptionController::class, 'createOrder']);
-Route::post('/cashfree/webhook', [CashfreeSubscriptionController::class, 'webhook']);
+
 
 
 // googlelogin route

@@ -40,6 +40,8 @@ class ReportController extends Controller
         // Ensure directory exists
         Storage::makeDirectory('/reports');
 
+        Log::info($data);
+
         // Render view based on type
         if ($type === 'tel') {
             $html = View::make('report.tel_template', compact('data'))->render();

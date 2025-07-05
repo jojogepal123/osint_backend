@@ -65,11 +65,6 @@ class ApiServiceController extends Controller
                     // ])->timeout(30)->post($urls['telegram'], [
                     //             'phone' => $number,
                     //         ]),
-                    'telData' => fn($pool) => $pool->withHeaders([
-                        'Content-Type' => 'application/json',
-                    ])->timeout(30)->post($urls['telegram'], [
-                                'phone' => $number,
-                            ]),
 
                     // 'allData' => fn($pool) => $pool->withHeaders([
                     //     'x-rapidapi-host' => env('ALL_MOBILE_API_HOST'),
@@ -80,6 +75,7 @@ class ApiServiceController extends Controller
                         'x-rapidapi-key' => env('SOCIAL_MEDIA_API_KEY'),
                         'x-rapidapi-host' => env('SOCIAL_MEDIA_API_HOST'),
                     ])->timeout(30)->get($urls['socialmedia'] . "/?phone={$number}"),
+
 
                     // 'sKData' => fn($pool) => $pool->withHeaders([
                     //     'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
@@ -92,17 +88,6 @@ class ApiServiceController extends Controller
                     // ])->timeout(30)->post($urls['spupi'], [
                     //             'mobile_number' => $localNumber,
                     //         ]),
-                    'sKData' => fn($pool) => $pool->withHeaders([
-                        'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
-                    ])->asJson()->timeout(30)->post($urls['spkyc'], [
-                                'mobile' => $localNumber,
-                            ]),
-                    'suData' => fn($pool) => $pool->withHeaders([
-                        'Content-Type' => 'application/json',
-                        'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
-                    ])->timeout(30)->post($urls['spupi'], [
-                                'mobile_number' => $localNumber,
-                            ]),
 
                     // 'sbData' => fn($pool) => $pool->withHeaders([
                     //     'Content-Type' => 'application/json',
@@ -116,18 +101,6 @@ class ApiServiceController extends Controller
                     // ])->timeout(30)->post($urls['sprc'], [
                     //             'mobile_number' => $localNumber,
                     //         ]),
-                    'sbData' => fn($pool) => $pool->withHeaders([
-                        'Content-Type' => 'application/json',
-                        'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
-                    ])->timeout(30)->post($urls['spbank'], [
-                                'mobile_no' => $localNumber,
-                            ]),
-                    'srData' => fn($pool) => $pool->withHeaders([
-                        'Content-Type' => 'application/json',
-                        'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
-                    ])->timeout(30)->post($urls['sprc'], [
-                                'mobile_number' => $localNumber,
-                            ]),
 
                 ];
                 $responses = Http::pool(fn($pool) => array_map(fn($req) => $req($pool), $requests));
@@ -211,13 +184,15 @@ class ApiServiceController extends Controller
             ]);
 
             $email = $request->query('email');
-
+            $encodedEmail = urlencode($email); // Required for query param
             $urls = [
                 'osint' => env('OSINTDATA_URL'),
                 'zehef' => env('ZEHEFDATA_URL'),
                 'holehe' => env('HOLEHEDATA_URL'),
                 'gmail' => env('EMAILDATA_URL'),
+                'socialscan' => env('SOCIALSCAN_URL'),
                 'hibp' => env('HIBPDATA_URL') . "/{$email}",
+                'getuser' => env('GETUSER_API_BASE') . "?email={$encodedEmail}&apikey=" . env('GETUSER_API_KEY'),
             ];
 
             try {
@@ -232,7 +207,13 @@ class ApiServiceController extends Controller
 
                     'holeheData' => fn($pool) => $pool->timeout(30)->post($urls['holehe'], ['email' => $email]),
 
+                    'socialScanData' => fn($pool) => $pool->timeout(30)->asJson()->post($urls['socialscan'], [
+                        'email' => $email,
+                    ]),
+
                     'emailData' => fn($pool) => $pool->timeout(30)->asJson()->post($urls['gmail'], ['email' => $email]),
+
+                    'getuserData' => fn($pool) => $pool->timeout(30)->get($urls['getuser']),
 
                     'hibpData' => fn($pool) => $pool->withHeaders([
                         'hibp-api-key' => env('HIBP_API_KEY'),
