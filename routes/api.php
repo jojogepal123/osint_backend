@@ -10,8 +10,6 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\CashfreeSubscriptionController;
 
-
-
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
 
@@ -43,7 +41,7 @@ Route::middleware(['auth:sanctum', 'throttle:30,1'])->group(function () {
     Route::post('/generate-report', [ReportController::class, 'generateReport']);
 
     Route::post('/generate-credit-report', [ReportController::class, 'generate']);
-    // Route::post('/generate-ai-report', [ReportController::class, 'generateAiReport']);
+    Route::post('/generate-ai-report', [ReportController::class, 'generateAiReport']);
 
     // Route::get('/download-report/{filename}', [ReportController::class, 'downloadReport']);
 });
