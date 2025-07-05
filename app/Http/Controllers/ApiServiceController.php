@@ -80,8 +80,8 @@ class ApiServiceController extends Controller
                     // 'sKData' => fn($pool) => $pool->withHeaders([
                     //     'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
                     // ])->asJson()->timeout(30)->post($urls['spkyc'], [
-                    //             'mobile' => $localNumber,
-                    //         ]),
+                    //     'mobile' => $localNumber,
+                    // ]),
                     // 'suData' => fn($pool) => $pool->withHeaders([
                     //     'Content-Type' => 'application/json',
                     //     'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
@@ -93,8 +93,8 @@ class ApiServiceController extends Controller
                     //     'Content-Type' => 'application/json',
                     //     'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
                     // ])->timeout(30)->post($urls['spbank'], [
-                    //             'mobile_no' => $localNumber,
-                    //         ]),
+                    //     'mobile_no' => $localNumber,
+                    // ]),
                     // 'srData' => fn($pool) => $pool->withHeaders([
                     //     'Content-Type' => 'application/json',
                     //     'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
