@@ -39,6 +39,9 @@ class ReportController extends Controller
 
         // Ensure directory exists
         Storage::makeDirectory('/reports');
+        // log::info($data);
+
+        Log::info($data);
 
         // Render view based on type
         if ($type === 'tel') {
@@ -66,121 +69,124 @@ class ReportController extends Controller
             return response()->json(['error' => 'PDF generation failed'], 500);
         }
     }
-    // public function generate(Request $request)
-    // {
-    //     $request->validate([
-    //         'name' => 'required|string',
-    //         'id_number' => 'required|string',
-    //         'mobile' => 'required|string',
-    //     ]);
 
-    //     try {
-    //         $response = Http::withHeaders([
-    //             'Content-Type' => 'application/json',
-    //             'Authorization' => 'Bearer ' . env('SUREPASS_API_TOKEN'),
-    //         ])->post(env('CREDITREPORT_URL'), [
-    //                     'name' => $request->input('name'),
-    //                     'id_number' => $request->input('id_number'),
-    //                     'id_type' => 'pan', // hardcoded as per your requirement
-    //                     'mobile' => $request->input('mobile'),
-    //                     'consent' => 'Y',
-    //                 ]);
 
-    //         if ($response->successful()) {
-    //             $data = $response->json();
+    public function generateAiReport(Request $request)
+    {
+        $validated = $request->validate([
+            'userInput' => 'required|string',
+            'type' => 'required|in:tel,email',
+            'results' => 'required|array',
+        ]);
 
-    //             // Check if credit_report_link exists in response data
-    //             if (isset($data['data']['credit_report_link'])) {
-    //                 $pdfUrl = $data['data']['credit_report_link'];
+        $userInput = $validated['userInput'];
+        $type = $validated['type'];
+        $results = $validated['results'];
 
-    //                 // Fetch the PDF file content from the URL
-    //                 $pdfResponse = Http::get($pdfUrl);
+        $prettyResults = json_encode($results, JSON_PRETTY_PRINT);
 
-    //                 if ($pdfResponse->successful()) {
-    //                     $pdfContent = $pdfResponse->body();
+        $prompt = <<<EOT
+        You are a senior OSINT (Open Source Intelligence) analyst.
 
-    //                     // Return the PDF file as a response with proper headers for download
-    //                     return response($pdfContent, 200)
-    //                         ->header('Content-Type', 'application/pdf')
-    //                         ->header('Content-Disposition', 'attachment; filename="credit-report.pdf"');
-    //                 } else {
-    //                     Log::error('Failed to fetch PDF from link', ['status' => $pdfResponse->status()]);
-    //                     return response()->json([
-    //                         'message' => 'Failed to fetch credit report PDF.',
-    //                     ], 500);
-    //                 }
-    //             } else {
-    //                 Log::error('credit_report_link not found in API response', ['response' => $data]);
-    //                 return response()->json([
-    //                     'message' => 'Credit report link missing in response.',
-    //                 ], 500);
-    //             }
-    //         } else {
-    //             Log::warning('Credit report API returned error', [
-    //                 'status' => $response->status(),
-    //                 'body' => $response->body(),
-    //             ]);
-    //             return response()->json([
-    //                 'message' => 'Failed to fetch credit report',
-    //                 'error' => $response->json(),
-    //             ], $response->status());
-    //         }
-    //     } catch (\Exception $e) {
-    //         Log::error('Exception while fetching credit report', [
-    //             'error' => $e->getMessage(),
-    //             'trace' => $e->getTraceAsString(),
-    //         ]);
-    //         return response()->json([
-    //             'message' => 'An error occurred while processing the request.',
-    //             'error' => $e->getMessage(),
-    //         ], 500);
-    //     }
-    // }
+        the following JSON contains structured profile data collected through various public sources, including phones, emails, usernames, social media presence, locations, carriers, upi deatails,bank details, rc number, data breaches, online presence, imsi number, phone status, leaked databases and other identifiers. also use sources which are mentioned in json data.
 
-    // public function generateAiReport(Request $request)
-    // {
-    //     $validated = $request->validate([
-    //         'type' => ['required', 'in:tel,email'],
-    //         'userInput' => ['required', 'string'],
-    //         'results' => ['required', 'array'],
-    //     ]);
+        Include:
+        - "intelligenceSummary": A full natural language summary of who this person is.
+        - "riskLevel": Low | Medium | High, with a full explaination and justification.
+        - "nextSteps": List of things an analyst should do next.
+        - "profileHighlights": Bullet points with full name, emails, phones, location, etc.
+        - "confidenceScore": Score from 0 to 100 showing how reliable this data looks.
+        - "anomalies": Any suspicious things (e.g. duplicate emails, mismatched names, missing fields).
+        - "socialPresenceSummary": Summary of detected presence on WhatsApp, Facebook, etc.
+        - "dataFreshness": "Active", "Outdated", or "Unknown", based on fields like last updated.
 
-    //     $type = $validated['type'];
-    //     $results = $validated['results'];
+        Respond in this JSON format:
 
-    //     if ($type === 'tel') {
-    //         $payload = [
-    //             'type' => 'tel',
-    //             'telProfile' => $results['profile'] ?? [],
-    //             'osintDataResults' => $results['osintData'] ?? [],
-    //         ];
-    //     } else {
-    //         $payload = [
-    //             'type' => 'email',
-    //             'emailProfile' => $results['profile'] ?? [],
-    //             'emailData' => $results['emailData'] ?? [],
-    //             'breachData' => $results['breachData'] ?? [],
-    //             'gravatar' => $results['gravatar'] ?? [],
-    //             'osintDataResults' => $results['osintData'] ?? [],
-    //         ];
-    //     }
+        {
+        "intelligenceSummary": "...",
+        "riskLevel": "...",
+        "nextSteps": [...],
+        "profileHighlights": [...],
+        "confidenceScore": 0–100,
+        "anomalies": [...],
+        "socialPresenceSummary": "...",
+        "dataFreshness": "..."
+        }
 
-    //     $response = Http::timeout(60)->post(env('GENREPORT_URL'), $payload);
+        --- Begin Data ---
+        {$prettyResults}
+        --- End Data ---
+        EOT;
 
-    //     if(!$response->successful() || !$response->json('filename')){
-    //         Log::error('Report generation failed',['response'=> $response->body()]);
-    //         return response()->json(['error'=>'Report generation failed'],500);
-    //     }
 
-    //     $filename = $response->json('filename');
-    //     $filepath = storage_path("app/private/reports/{$filename}");
+        // Step 3: Call Gemini API
+        $response = Http::timeout(20)
+            ->retry(3, 200)
+            ->post(
+                'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' . env('GEMINI_API_KEY'),
+                [
+                    'contents' => [[
+                        'parts' => [['text' => $prompt]]
+                    ]]
+                ]
+            );
 
-    //     if(!file_exists($filepath)){
-    //         Log::error('File not found',['path'=>$filepath]);
-    //         return response()->json(['error'=>'File not found'],500);
-    //     }
+        if (!$response->successful()) {
+            Log::error("Gemini AI request failed", [
+                'status' => $response->status(),
+                'body' => $response->body(),
+            ]);
+            return response()->json(['error' => 'Gemini AI failed to generate report.'], 500);
+        }
 
-    //     Log::info("file downloaded successfully!",['filename'=>$filename]);
-    //     return response()->download($filepath,$filename);
-    // }
+        $rawText = $response['candidates'][0]['content']['parts'][0]['text'] ?? '{}';
+
+        // Clean out markdown backticks (```json ... ```)
+        $cleanJson = trim($rawText);
+        $cleanJson = preg_replace('/^```json\s*/', '', $cleanJson); // remove start ```json
+        $cleanJson = preg_replace('/```$/', '', $cleanJson);        // remove end ```
+
+        // Now decode the clean JSON
+        $responseData = json_decode($cleanJson, true);
+
+
+        // 🧾 Fallback-safe values
+        $summary = $responseData['intelligenceSummary'] ?? 'No summary generated.';
+        $riskLevel = $responseData['riskLevel'] ?? 'Unknown';
+        $nextSteps = $responseData['nextSteps'] ?? [];
+        $profileHighlights = $responseData['profileHighlights'] ?? [];
+        $confidenceScore = $responseData['confidenceScore'] ?? null;
+        $anomalies = $responseData['anomalies'] ?? [];
+        $socialPresenceSummary = $responseData['socialPresenceSummary'] ?? null;
+        $dataFreshness = $responseData['dataFreshness'] ?? null;
+
+        $template = $type === 'tel' ? 'report.ai-tel_template' : 'report.ai-email_template';
+        // Step 5: Render PDF with full results + Gemini summary
+        $pdf = PDF::loadView($template, [
+            'summary' => $summary,
+            'riskLevel' => $riskLevel,
+            'nextSteps' => $nextSteps,
+            'profileHighlights' => $profileHighlights,
+            'confidenceScore' => $confidenceScore,
+            'anomalies' => $anomalies,
+            'socialPresenceSummary' => $socialPresenceSummary,
+            'dataFreshness' => $dataFreshness,
+            'userInput' => $userInput,
+            'generation_time' => now()->format('Y-m-d H:i:s'),
+            'type' => $type,
+            'results' => $results, // full original results
+        ]);
+
+        // Log::info('Gemini cleaned JSON', [
+        //     'summary' => $summary,
+        //     'riskLevel' => $riskLevel,
+        //     'nextSteps' => $nextSteps,
+        // ]);
+
+        $filename = 'ai-report-' . Str::slug($userInput) . '.pdf';
+
+        return response($pdf->output(), 200)
+            ->header('Content-Type', 'application/pdf')
+            ->header('Content-Disposition', "attachment; filename={$filename}");
+    }
 }

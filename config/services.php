@@ -34,5 +34,10 @@ return [
             'channel' => env('SLACK_BOT_USER_DEFAULT_CHANNEL'),
         ],
     ],
+    'cashfree' => [
+        'client_id' => env('CASHFREE_CLIENT_ID'),
+        'client_secret' => env('CASHFREE_CLIENT_SECRET'),
+        'environment' => env('CASHFREE_ENVIRONMENT', 'sandbox'), // 'sandbox' or 'production'
+    ],
 
 ];
