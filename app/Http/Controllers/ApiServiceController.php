@@ -31,14 +31,14 @@ class ApiServiceController extends Controller
                 'osint' => env('OSINTDATA_URL'),
                 'truecaller' => env('TRUECALLERDATA_URL'),
                 'whatsapp' => env('WHATSAPPDATA_URL'),
-                // 'telegram' => env('TELEGRAMDATA_URL'),
+                'telegram' => env('TELEGRAMDATA_URL'),
                 // 'allmobile' => env('ALLMOBILEDATA_URL'),
                 'callerapi' => env('CALL_PRES_URL'),
                 'socialmedia' => env('SOCIALMEDIADATA_URL'),
-                // 'spkyc' => env('SPKYC_URL'),
-                // 'spupi' => env('SPUPI_URL'),
-                // 'spbank' => env('SPBANK_URL'),
-                // 'sprc' => env('SPRC_URL'),
+                'spkyc' => env('SPKYC_URL'),
+                'spupi' => env('SPUPI_URL'),
+                'spbank' => env('SPBANK_URL'),
+                'sprc' => env('SPRC_URL'),
             ];
 
             try {
@@ -60,11 +60,11 @@ class ApiServiceController extends Controller
                         'x-rapidapi-host' => env('TEL_API_HOST'),
                     ])->timeout(30)->get($urls['whatsapp'] . "/{$number}"),
 
-                    // 'telData' => fn($pool) => $pool->withHeaders([
-                    //     'Content-Type' => 'application/json',
-                    // ])->timeout(30)->post($urls['telegram'], [
-                    //             'phone' => $number,
-                    //         ]),
+                    'telData' => fn($pool) => $pool->withHeaders([
+                        'Content-Type' => 'application/json',
+                    ])->timeout(30)->post($urls['telegram'], [
+                                'phone' => $number,
+                            ]),
 
                     // 'allData' => fn($pool) => $pool->withHeaders([
                     //     'x-rapidapi-host' => env('ALL_MOBILE_API_HOST'),
@@ -77,30 +77,31 @@ class ApiServiceController extends Controller
                     ])->timeout(30)->get($urls['socialmedia'] . "/?phone={$number}"),
 
 
-                    // 'sKData' => fn($pool) => $pool->withHeaders([
-                    //     'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
-                    // ])->asJson()->timeout(30)->post($urls['spkyc'], [
-                    //     'mobile' => $localNumber,
-                    // ]),
-                    // 'suData' => fn($pool) => $pool->withHeaders([
-                    //     'Content-Type' => 'application/json',
-                    //     'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
-                    // ])->timeout(30)->post($urls['spupi'], [
-                    //             'mobile_number' => $localNumber,
-                    //         ]),
+                    'sKData' => fn($pool) => $pool->withHeaders([
+                        'Content-Type' => 'application/json',
+                        'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
+                    ])->timeout(30)->post($urls['spkyc'], [
+                                'mobile' => $localNumber,
+                            ]),
+                    'suData' => fn($pool) => $pool->withHeaders([
+                        'Content-Type' => 'application/json',
+                        'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
+                    ])->timeout(30)->post($urls['spupi'], [
+                                'mobile_number' => $localNumber,
+                            ]),
 
-                    // 'sbData' => fn($pool) => $pool->withHeaders([
-                    //     'Content-Type' => 'application/json',
-                    //     'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
-                    // ])->timeout(30)->post($urls['spbank'], [
-                    //     'mobile_no' => $localNumber,
-                    // ]),
-                    // 'srData' => fn($pool) => $pool->withHeaders([
-                    //     'Content-Type' => 'application/json',
-                    //     'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
-                    // ])->timeout(30)->post($urls['sprc'], [
-                    //             'mobile_number' => $localNumber,
-                    //         ]),
+                    'sbData' => fn($pool) => $pool->withHeaders([
+                        'Content-Type' => 'application/json',
+                        'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
+                    ])->timeout(30)->post($urls['spbank'], [
+                                'mobile_no' => $localNumber,
+                            ]),
+                    'srData' => fn($pool) => $pool->withHeaders([
+                        'Content-Type' => 'application/json',
+                        'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
+                    ])->timeout(30)->post($urls['sprc'], [
+                                'mobile_number' => $localNumber,
+                            ]),
 
                 ];
                 $responses = Http::pool(fn($pool) => array_map(fn($req) => $req($pool), $requests));

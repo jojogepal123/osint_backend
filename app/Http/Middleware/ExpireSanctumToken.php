@@ -18,18 +18,19 @@ class ExpireSanctumToken
 
             if ($accessToken) {
                 $minutesToExpire = 60;
+                $secondsToExpire = $minutesToExpire * 60;
 
-                // Log token creation and current time
+                // Log token creation and current time for debugging
                 Log::info('Sanctum Token Check', [
                     'token_id' => $accessToken->id,
                     'created_at' => $accessToken->created_at->toDateTimeString(),
                     'now' => now()->toDateTimeString(),
-                    'diff_minutes' => $accessToken->created_at->diffInMinutes(now()),
-                    'expires_in' => $minutesToExpire,
+                    'diff_seconds' => $accessToken->created_at->diffInSeconds(now()),
+                    'expires_in_seconds' => $secondsToExpire,
                 ]);
 
-                if ($accessToken->created_at->diffInMinutes(now()) >= $minutesToExpire) {
-                    Log::info('Sanctum token expired and deleted', [
+                if ($accessToken->created_at->diffInSeconds(now()) >= $secondsToExpire) {
+                    Log::warning('Sanctum token expired and deleted', [
                         'token_id' => $accessToken->id,
                     ]);
 
@@ -37,7 +38,7 @@ class ExpireSanctumToken
                     return response()->json(['message' => 'Token expired'], 401);
                 }
             } else {
-                Log::warning('Sanctum token not found in DB');
+                Log::warning('Sanctum token not found in DB or invalid');
             }
         }
 
