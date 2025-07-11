@@ -134,7 +134,24 @@
         <p><strong>Type:</strong> {{ ucfirst($type) }}</p>
         <p><strong>Generated At:</strong> {{ $generation_time }}</p>
     </div>
-
+    <div class="section highlight" style="border-left: 6px solid #f59e0b;">
+        <h2 style="color: #b45309;">CONFIDENTIAL – FOR AUTHORIZED LAW ENFORCEMENT PERSONNEL ONLY</h2>
+        <p>This report is intended strictly for legitimate investigative use by authorized law enforcement officers, in
+            accordance with applicable Indian laws and regulations. It contains intelligence derived solely from
+            publicly accessible sources and licensed investigative tools. No unauthorized, leaked, or unlawfully
+            obtained data is included.</p>
+        <p>Distribution of this report through unauthorized channels—including but not limited to WhatsApp, Telegram,
+            email groups, or other social media platforms—is strictly prohibited.</p>
+        <p>All information contained herein must be handled with utmost confidentiality and used in full compliance with
+            applicable legal frameworks, including the <strong>Information Technology Act, 2000</strong>, and the
+            <strong>Digital Personal Data Protection Act, 2023</strong> (upon its enforcement).
+        </p>
+        <p>Law enforcement personnel are solely responsible for ensuring that any use of this information is supported
+            by appropriate legal authorization or explicit consent from the data subject, as required.</p>
+        <p><strong>OSINTWORK</strong> operates solely as a technical intermediary and does not store or retain any
+            personal data. It assumes no liability for the unauthorized use, distribution, or interpretation of the
+            information contained in this report.</p>
+    </div>
     @if($summary)
         <div class="section">
             <h2>[Summary] Intelligence Summary</h2>

@@ -41,11 +41,13 @@ Route::middleware(['auth:sanctum', 'token.expire', 'throttle:30,1'])->group(func
     Route::get('/tel', [ApiServiceController::class, 'getTelData']);
     // Route::get('/email/{email}', [ApiServiceController::class, 'getEmailData']);
     Route::get('/email', [ApiServiceController::class, 'getEmailData']);
+    Route::post('/rcfull-details', [ApiServiceController::class, 'getRcFullDetails']);
 
     Route::post('/generate-report', [ReportController::class, 'generateReport']);
 
     Route::post('/generate-credit-report', [ReportController::class, 'generate']);
     Route::post('/generate-ai-report', [ReportController::class, 'generateAiReport']);
+    Route::post('/generate-rc-report', [ReportController::class, 'generateRcReport']);
 
     // Route::get('/download-report/{filename}', [ReportController::class, 'downloadReport']);
 });

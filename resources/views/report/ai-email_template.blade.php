@@ -134,7 +134,24 @@
         <p><strong>Type:</strong> {{ ucfirst($type) }}</p>
         <p><strong>Generated At:</strong> {{ $generation_time }}</p>
     </div>
-
+    <div class="section highlight" style="border-left: 6px solid #f59e0b;">
+        <h2 style="color: #b45309;">CONFIDENTIAL – FOR AUTHORIZED LAW ENFORCEMENT PERSONNEL ONLY</h2>
+        <p>This report is intended strictly for legitimate investigative use by authorized law enforcement officers, in
+            accordance with applicable Indian laws and regulations. It contains intelligence derived solely from
+            publicly accessible sources and licensed investigative tools. No unauthorized, leaked, or unlawfully
+            obtained data is included.</p>
+        <p>Distribution of this report through unauthorized channels—including but not limited to WhatsApp, Telegram,
+            email groups, or other social media platforms—is strictly prohibited.</p>
+        <p>All information contained herein must be handled with utmost confidentiality and used in full compliance with
+            applicable legal frameworks, including the <strong>Information Technology Act, 2000</strong>, and the
+            <strong>Digital Personal Data Protection Act, 2023</strong> (upon its enforcement).
+        </p>
+        <p>Law enforcement personnel are solely responsible for ensuring that any use of this information is supported
+            by appropriate legal authorization or explicit consent from the data subject, as required.</p>
+        <p><strong>OSINTWORK</strong> operates solely as a technical intermediary and does not store or retain any
+            personal data. It assumes no liability for the unauthorized use, distribution, or interpretation of the
+            information contained in this report.</p>
+    </div>
     @if($summary)
         <div class="section">
             <h2>[Summary] Intelligence Summary</h2>
@@ -207,10 +224,70 @@
             <p>{{ $dataFreshness }}</p>
         </div>
     @endif
+    <div class="legal-disclaimer">
+        <h2>LEGAL DISCLAIMER FOR OSINT REPORT</h2>
+        <p>This Open Source Intelligence (OSINT) report has been prepared by <strong>OSINTWORK</strong>, a private
+            entity
+            acting solely as a technical intermediary, at the request of, and for the exclusive use of, authorized law
+            enforcement agencies. The information contained in this report has been gathered strictly from publicly
+            accessible sources and legally verified digital tools as of the date of its generation. No leaked,
+            unauthorized,
+            or unlawfully obtained data has been used in its preparation.</p>
+        <p><strong>Use of this report is governed by the following conditions:</strong></p>
+        <ol>
+            <li><strong>Authorized Use:</strong> This report is intended solely for use by duly authorized law
+                enforcement
+                officers for legitimate investigative purposes, as defined under Indian law. The requesting agency
+                assumes
+                full responsibility for the lawful, ethical, and appropriate use of the information contained herein.
+            </li>
+            <li><strong>Legal Compliance:</strong> Use of this report must be in strict compliance with all applicable
+                Indian laws and regulations, including but not limited to:
+                <ul>
+                    <li>The Information Technology Act, 2000</li>
+                    <li>The Bharatiya Nyaya Sanhita (BNS)</li>
+                    <li>The Bharatiya Nagarik Suraksha Sanhita (BNSS)</li>
+                    <li>The Bharatiya Sakshya Adhiniyam (BSA)</li>
+                    <li>Relevant constitutional protections, including Article 21 pertaining to the Right to Privacy
+                    </li>
+                    <li>The Digital Personal Data Protection Act, 2023 (upon its enforcement)</li>
+                </ul>
+            </li>
+            <li><strong>Data Protection and Retention:</strong> OSINTWORK compiles this report using ethical and legally
+                compliant OSINT methodologies. No personal data is stored post-transmission. The requesting law
+                enforcement
+                agency bears sole responsibility for ensuring compliance with relevant data protection regulations and
+                internal data handling policies.</li>
+            <li><strong>Verification Requirement:</strong> The information in this report is derived from OSINT
+                techniques
+                and should be treated as preliminary intelligence. It must be independently verified by the requesting
+                agency through official and legally admissible channels prior to being used in legal proceedings or
+                enforcement actions.</li>
+            <li><strong>Confidentiality:</strong> This report is strictly confidential and may not be disclosed, shared,
+                or
+                disseminated beyond the scope of the official investigation for which it was requested. The agency is
+                responsible for maintaining the confidentiality of this document and limiting access to authorized
+                personnel
+                only.</li>
+            <li><strong>Limited Liability:</strong> OSINTWORK shall not be held liable for any direct or indirect
+                consequences arising from the use, misuse, or interpretation of the information provided herein.</li>
+            <li><strong>No Legal Advice:</strong> This report does not constitute legal advice. The recipient agency
+                must
+                consult its own legal counsel for lawful and appropriate use.</li>
+            <li><strong>Ethical Use:</strong> The receiving agency is expected to ensure that the information is used in
+                a
+                manner consistent with ethical law enforcement practices.</li>
+            <li><strong>Contractual Obligations:</strong> Use is subject to terms in the service agreement or MoU
+                between
+                OSINTWORK and the requesting agency.</li>
+        </ol>
+        <p>By accepting and utilizing this report, the law enforcement agency affirms its agreement with these terms and
+            acknowledges that OSINTWORK acts strictly as an intermediary.</p>
+    </div>
 
 
     <div class="footer">
-        This report was automatically generated using AI (Gemini) via {{ config('app.name') }} on
+        This report was automatically generated via {{ config('app.name') }} on
         {{ now()->format('Y-m-d') }}.
     </div>
 

@@ -31,14 +31,15 @@ class ApiServiceController extends Controller
                 'osint' => env('OSINTDATA_URL'),
                 'truecaller' => env('TRUECALLERDATA_URL'),
                 'whatsapp' => env('WHATSAPPDATA_URL'),
-                'telegram' => env('TELEGRAMDATA_URL'),
+                // 'telegram' => env('TELEGRAMDATA_URL'),
                 // 'allmobile' => env('ALLMOBILEDATA_URL'),
                 'callerapi' => env('CALL_PRES_URL'),
                 'socialmedia' => env('SOCIALMEDIADATA_URL'),
-                'spkyc' => env('SPKYC_URL'),
-                'spupi' => env('SPUPI_URL'),
-                'spbank' => env('SPBANK_URL'),
-                'sprc' => env('SPRC_URL'),
+                // 'spkyc' => env('SPKYC_URL'),
+                // 'spupi' => env('SPUPI_URL'),
+                // 'spbank' => env('SPBANK_URL'),
+                // 'sprc' => env('SPRC_URL'),
+                // 'sprcFull' => env('SPRCTXT_URL'),
             ];
 
             try {
@@ -60,11 +61,11 @@ class ApiServiceController extends Controller
                         'x-rapidapi-host' => env('TEL_API_HOST'),
                     ])->timeout(30)->get($urls['whatsapp'] . "/{$number}"),
 
-                    'telData' => fn($pool) => $pool->withHeaders([
-                        'Content-Type' => 'application/json',
-                    ])->timeout(30)->post($urls['telegram'], [
-                                'phone' => $number,
-                            ]),
+                    // 'telData' => fn($pool) => $pool->withHeaders([
+                    //     'Content-Type' => 'application/json',
+                    // ])->timeout(30)->post($urls['telegram'], [
+                    //             'phone' => $number,
+                    //         ]),
 
                     // 'allData' => fn($pool) => $pool->withHeaders([
                     //     'x-rapidapi-host' => env('ALL_MOBILE_API_HOST'),
@@ -77,31 +78,31 @@ class ApiServiceController extends Controller
                     ])->timeout(30)->get($urls['socialmedia'] . "/?phone={$number}"),
 
 
-                    'sKData' => fn($pool) => $pool->withHeaders([
-                        'Content-Type' => 'application/json',
-                        'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
-                    ])->timeout(30)->post($urls['spkyc'], [
-                                'mobile' => $localNumber,
-                            ]),
-                    'suData' => fn($pool) => $pool->withHeaders([
-                        'Content-Type' => 'application/json',
-                        'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
-                    ])->timeout(30)->post($urls['spupi'], [
-                                'mobile_number' => $localNumber,
-                            ]),
+                    // 'sKData' => fn($pool) => $pool->withHeaders([
+                    //     'Content-Type' => 'application/json',
+                    //     'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
+                    // ])->timeout(30)->post($urls['spkyc'], [
+                    //             'mobile' => $localNumber,
+                    //         ]),
+                    // 'suData' => fn($pool) => $pool->withHeaders([
+                    //     'Content-Type' => 'application/json',
+                    //     'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
+                    // ])->timeout(30)->post($urls['spupi'], [
+                    //             'mobile_number' => $localNumber,
+                    //         ]),
 
-                    'sbData' => fn($pool) => $pool->withHeaders([
-                        'Content-Type' => 'application/json',
-                        'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
-                    ])->timeout(30)->post($urls['spbank'], [
-                                'mobile_no' => $localNumber,
-                            ]),
-                    'srData' => fn($pool) => $pool->withHeaders([
-                        'Content-Type' => 'application/json',
-                        'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
-                    ])->timeout(30)->post($urls['sprc'], [
-                                'mobile_number' => $localNumber,
-                            ]),
+                    // 'sbData' => fn($pool) => $pool->withHeaders([
+                    //     'Content-Type' => 'application/json',
+                    //     'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
+                    // ])->timeout(30)->post($urls['spbank'], [
+                    //             'mobile_no' => $localNumber,
+                    //         ]),
+                    // 'srData' => fn($pool) => $pool->withHeaders([
+                    //     'Content-Type' => 'application/json',
+                    //     'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
+                    // ])->timeout(30)->post($urls['sprc'], [
+                    //             'mobile_number' => $localNumber,
+                    //         ]),
 
                 ];
                 $responses = Http::pool(fn($pool) => array_map(fn($req) => $req($pool), $requests));
@@ -283,4 +284,43 @@ class ApiServiceController extends Controller
             return response()->json(['error' => 'An internal server error occurred.'], 500);
         }
     }
+
+
+    public function getRcFullDetails(Request $request)
+    {
+        $request->validate([
+            'id_number' => ['required', 'string'],
+        ]);
+
+        $idNumber = $request->input('id_number');
+        Log::debug('Surepass RC Full Lookup Request', [
+            'id_number' => $idNumber,
+        ]);
+
+        try {
+            $response = Http::withHeaders([
+                'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
+                'Content-Type' => 'application/json',
+            ])->timeout(30)->post(env('SPRCTXT_URL'), [
+                        'id_number' => $idNumber,
+                    ]);
+
+            if ($response->successful()) {
+                return response()->json($response->json());
+            } else {
+                return response()->json([
+                    'error' => 'Failed to fetch RC details',
+                    'status' => $response->status(),
+                    'body' => $response->body()
+                ], $response->status());
+            }
+        } catch (\Throwable $e) {
+            \Log::error('Surepass RC Full Lookup Error', [
+                'error' => $e->getMessage(),
+                'id_number' => $idNumber,
+            ]);
+            return response()->json(['error' => 'Server error occurred.'], 500);
+        }
+    }
+
 }
