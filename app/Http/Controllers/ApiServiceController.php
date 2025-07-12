@@ -39,7 +39,7 @@ class ApiServiceController extends Controller
                 // 'spupi' => env('SPUPI_URL'),
                 // 'spbank' => env('SPBANK_URL'),
                 // 'sprc' => env('SPRC_URL'),
-                // 'sprcFull' => env('SPRCTXT_URL'),
+
             ];
 
             try {
@@ -293,9 +293,9 @@ class ApiServiceController extends Controller
         ]);
 
         $idNumber = $request->input('id_number');
-        Log::debug('Surepass RC Full Lookup Request', [
-            'id_number' => $idNumber,
-        ]);
+        // Log::debug('Surepass RC Full Lookup Request', [
+        //     'id_number' => $idNumber,
+        // ]);
 
         try {
             $response = Http::withHeaders([
