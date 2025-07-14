@@ -46,9 +46,9 @@ class ApiServiceController extends Controller
                     'osintData' => fn($pool) => $pool->withHeaders([
                         'x-api-key' => env('X_API_KEY'),
                     ])->timeout(30)->get($urls['osint'], [
-                                'phone' => $number,
-                                'per_page' => 50,
-                            ]),
+                        'phone' => $number,
+                        'per_page' => 50,
+                    ]),
 
                     'tcData' => fn($pool) => $pool->withHeaders([
                         'x-rapidapi-key' => env('TRUECALLER_API_KEY'),
@@ -63,8 +63,8 @@ class ApiServiceController extends Controller
                     'telData' => fn($pool) => $pool->withHeaders([
                         'Content-Type' => 'application/json',
                     ])->timeout(30)->post($urls['telegram'], [
-                                'phone' => $number,
-                            ]),
+                        'phone' => $number,
+                    ]),
 
                     // 'allData' => fn($pool) => $pool->withHeaders([
                     //     'x-rapidapi-host' => env('ALL_MOBILE_API_HOST'),
@@ -81,27 +81,27 @@ class ApiServiceController extends Controller
                         'Content-Type' => 'application/json',
                         'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
                     ])->timeout(30)->post($urls['spkyc'], [
-                                'mobile' => $localNumber,
-                            ]),
+                        'mobile' => $localNumber,
+                    ]),
                     'suData' => fn($pool) => $pool->withHeaders([
                         'Content-Type' => 'application/json',
                         'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
                     ])->timeout(30)->post($urls['spupi'], [
-                                'mobile_number' => $localNumber,
-                            ]),
+                        'mobile_number' => $localNumber,
+                    ]),
 
                     'sbData' => fn($pool) => $pool->withHeaders([
                         'Content-Type' => 'application/json',
                         'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
                     ])->timeout(30)->post($urls['spbank'], [
-                                'mobile_no' => $localNumber,
-                            ]),
+                        'mobile_no' => $localNumber,
+                    ]),
                     'srData' => fn($pool) => $pool->withHeaders([
                         'Content-Type' => 'application/json',
                         'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
                     ])->timeout(30)->post($urls['sprc'], [
-                                'mobile_number' => $localNumber,
-                            ]),
+                        'mobile_number' => $localNumber,
+                    ]),
 
                 ];
                 $responses = Http::pool(fn($pool) => array_map(fn($req) => $req($pool), $requests));
@@ -201,10 +201,10 @@ class ApiServiceController extends Controller
                     'osintData' => fn($pool) => $pool->withHeaders([
                         'x-api-key' => env('X_API_KEY'),
                     ])->timeout(30)->get($urls['osint'], [
-                                'email' => $email,
-                                'per_page' => 50,
-                            ]),
-                    'zehefData' => fn($pool) => $pool->timeout(30)->post($urls['zehef'], ['email' => $email]),
+                        'email' => $email,
+                        'per_page' => 50,
+                    ]),
+                    'zehefData' => fn($pool) => $pool->timeout(60)->post($urls['zehef'], ['email' => $email]),
 
                     'holeheData' => fn($pool) => $pool->timeout(30)->post($urls['holehe'], ['email' => $email]),
 
@@ -282,5 +282,126 @@ class ApiServiceController extends Controller
             ]);
             return response()->json(['error' => 'An internal server error occurred.'], 500);
         }
+    }
+
+    public function leakDataFinder(Request $request)
+    {
+        $data = $request->input('fields');
+        $page = (int) $request->query('page', 1);
+        $perPage = (int) $request->query('per_page', 10);
+
+        if (!$data || !is_array($data)) {
+            return response()->json(['error' => 'Invalid search data'], 400);
+        }
+
+        $params = [
+            'page' => $page,
+            'per_page' => $perPage,
+        ];
+        $hasKeyValue = false;
+        foreach ($data as $item) {
+            $key = $item['type'] ?? null;
+            $value = $item['value'] ?? null;
+
+            if ($key && $value) {
+                $params[$key] = $value;
+                $hasKeyValue = true;
+            }
+        }
+
+        if (!$hasKeyValue) {
+            return response()->json(['error' => 'No valid search parameters provided'], 400);
+        }
+        try {
+            $headers = [
+                'x-api-key' => env('X_API_KEY'),
+                'Content-Type' => 'application/json',
+            ];
+            $fastapiUrl = env('OSINTDATA_URL');
+            $response = Http::withHeaders($headers)->timeout(30)->get($fastapiUrl, $params);
+
+            if ($response->successful()) {
+                $data = $response->json();
+                return response()->json($data);
+            } else {
+                return response()->json(['error' => 'Failed to fetch data from API'], 500);
+            }
+        } catch (\Exception $e) {
+            Log::error('Leak Data Finder Error', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            return response()->json(['error' => 'An internal server error occurred.'], 500);
+        }
+    }
+
+    public function corporateData(Request $request)
+    {
+        $type = $request->input('type');
+        $data = $request->input('data');
+
+        if (!$type || !$data) {
+            return response()->json(['error' => 'Invalid search request'], 400);
+        }
+
+        switch ($type) {
+            case 'corporate_gstin':
+                return $this->handleCorporateGstin($data);
+            case 'credit_report':
+                return $this->handleCreditReport($data);
+            case 'corporate_cin':
+                return $this->handleCorporateCin($data);
+            case 'gst_intel':
+                return $this->handleGstIntel($data);
+            case 'employment_history':
+                return $this->handleEmploymentHistory($data);
+            case 'find_uan':
+                return $this->handleFindUan($data);
+            case 'pan_to_uan':
+                return $this->handlePanToUan($data);
+            default:
+                return response()->json(['error' => 'Invalid search request'], 400);
+        }
+    }
+
+    private function handleCorporateGstin($data)
+    {
+        return response()->json(['message' => 'Handled corporate_gstin', 'data' => $data]);
+    }
+
+    private function handleCreditReport($data)
+    {
+        // Validate and process $data as needed
+        return response()->json(['message' => 'Handled credit_report', 'data' => $data]);
+    }
+
+    private function handleCorporateCin($data)
+    {
+        // Validate and process $data as needed
+        return response()->json(['message' => 'Handled corporate_cin', 'data' => $data]);
+    }
+
+    private function handleGstIntel($data)
+    {
+        // Validate and process $data as needed
+        return response()->json(['message' => 'Handled gst_intel', 'data' => $data]);
+    }
+
+    private function handleEmploymentHistory($data)
+    {
+        // Validate and process $data as needed
+        return response()->json(['message' => 'Handled employment_history', 'data' => $data]);
+    }
+
+    private function handleFindUan($data)
+    {
+        // Validate and process $data as needed
+        return response()->json(['message' => 'Handled find_uan', 'data' => $data]);
+    }
+
+    private function handlePanToUan($data)
+    {
+        // Validate and process $data as needed
+        return response()->json(['message' => 'Handled pan_to_uan', 'data' => $data]);
     }
 }

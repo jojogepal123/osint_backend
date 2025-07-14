@@ -42,6 +42,9 @@ Route::middleware(['auth:sanctum', 'token.expire', 'throttle:30,1'])->group(func
     // Route::get('/email/{email}', [ApiServiceController::class, 'getEmailData']);
     Route::get('/email', [ApiServiceController::class, 'getEmailData']);
 
+    Route::post('/leak-data-finder', [ApiServiceController::class, 'leakDataFinder']);
+    Route::post('/corporate-intelligence', [ApiServiceController::class, 'corporateData']);
+
     Route::post('/generate-report', [ReportController::class, 'generateReport']);
 
     Route::post('/generate-credit-report', [ReportController::class, 'generate']);

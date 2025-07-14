@@ -135,77 +135,79 @@
         <p><strong>Generated At:</strong> {{ $generation_time }}</p>
     </div>
 
+
+
     @if($summary)
-        <div class="section">
-            <h2>[Summary] Intelligence Summary</h2>
-            <div class="highlight">
-                {{ $summary }}
-            </div>
+    <div class="section">
+        <h2>[Summary] Intelligence Summary</h2>
+        <div class="highlight">
+            {{ $summary }}
         </div>
+    </div>
     @endif
 
     @if($riskLevel)
-        <div class="section">
-            <h2>[Risk] Risk Analysis</h2>
-            <div class="risk">
-                {{ $riskLevel }}
-            </div>
+    <div class="section">
+        <h2>[Risk] Risk Analysis</h2>
+        <div class="risk">
+            {{ $riskLevel }}
         </div>
+    </div>
     @endif
 
 
     @if(!empty($nextSteps))
-        <div class="section">
-            <h2>[Next Steps] Recommended Next Steps</h2>
-            <ol class="next-steps">
-                @foreach($nextSteps as $step)
-                    <li>{{ $step }}</li>
-                @endforeach
-            </ol>
-        </div>
+    <div class="section">
+        <h2>[Next Steps] Recommended Next Steps</h2>
+        <ol class="next-steps">
+            @foreach($nextSteps as $step)
+            <li>{{ $step }}</li>
+            @endforeach
+        </ol>
+    </div>
     @endif
 
     @if(!empty($profileHighlights))
-        <div class="section">
-            <h2>[Highlights] Profile Highlights</h2>
-            <ul>
-                @foreach($profileHighlights as $item)
-                    <li>{{ $item }}</li>
-                @endforeach
-            </ul>
-        </div>
+    <div class="section">
+        <h2>[Highlights] Profile Highlights</h2>
+        <ul>
+            @foreach($profileHighlights as $item)
+            <li>{{ $item }}</li>
+            @endforeach
+        </ul>
+    </div>
     @endif
 
     @if($confidenceScore !== null)
-        <div class="section">
-            <h2>[Score] Confidence Score</h2>
-            <p>{{ $confidenceScore }}%</p>
-        </div>
+    <div class="section">
+        <h2>[Score] Confidence Score</h2>
+        <p>{{ $confidenceScore }}%</p>
+    </div>
     @endif
 
     @if(!empty($anomalies))
-        <div class="section anomalies">
-            <h2>[Anomalies] Anomalies</h2>
-            <ul>
-                @foreach($anomalies as $a)
-                    <li>{{ $a }}</li>
-                @endforeach
-            </ul>
-        </div>
+    <div class="section anomalies">
+        <h2>[Anomalies] Anomalies</h2>
+        <ul>
+            @foreach($anomalies as $a)
+            <li>{{ $a }}</li>
+            @endforeach
+        </ul>
+    </div>
     @endif
 
     @if($socialPresenceSummary)
-        <div class="section social-summary">
-            <h2>[Social Summary] Social Media Summary</h2>
-            <p>{{ $socialPresenceSummary }}</p>
-        </div>
+    <div class="section social-summary">
+        <h2>[Social Summary] Social Media Summary</h2>
+        <p>{{ $socialPresenceSummary }}</p>
+    </div>
     @endif
 
     @if($dataFreshness)
-        <div class="section data-freshness">
-            <h2>[Data Freshness] Data Freshness</h2>
-            <p>{{ $dataFreshness }}</p>
-        </div>
+    <div class="section data-freshness">
+        <h2>[Data Freshness] Data Freshness</h2>
+        <p>{{ $dataFreshness }}</p>
+    </div>
     @endif
 
 
