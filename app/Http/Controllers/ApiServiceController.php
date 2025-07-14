@@ -105,8 +105,6 @@ class ApiServiceController extends Controller
                     //             'mobile_number' => $localNumber,
                     //         ]),
 
-
-
                 ];
                 $responses = Http::pool(fn($pool) => array_map(fn($req) => $req($pool), $requests));
             } catch (\Exception $e) {
