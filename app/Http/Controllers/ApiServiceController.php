@@ -31,14 +31,14 @@ class ApiServiceController extends Controller
                 'osint' => env('OSINTDATA_URL'),
                 'truecaller' => env('TRUECALLERDATA_URL'),
                 'whatsapp' => env('WHATSAPPDATA_URL'),
-                // 'telegram' => env('TELEGRAMDATA_URL'),
+                'telegram' => env('TELEGRAMDATA_URL'),
                 // 'allmobile' => env('ALLMOBILEDATA_URL'),
                 'callerapi' => env('CALL_PRES_URL'),
                 'socialmedia' => env('SOCIALMEDIADATA_URL'),
-                // 'spkyc' => env('SPKYC_URL'),
-                // 'spupi' => env('SPUPI_URL'),
-                // 'spbank' => env('SPBANK_URL'),
-                // 'sprc' => env('SPRC_URL'),
+                'spkyc' => env('SPKYC_URL'),
+                'spupi' => env('SPUPI_URL'),
+                'spbank' => env('SPBANK_URL'),
+                'sprc' => env('SPRC_URL'),
 
             ];
 
@@ -62,11 +62,11 @@ class ApiServiceController extends Controller
                     ])->timeout(30)->get($urls['whatsapp'] . "/{$number}"),
 
 
-                    // 'telData' => fn($pool) => $pool->withHeaders([
-                    //     'Content-Type' => 'application/json',
-                    // ])->timeout(30)->post($urls['telegram'], [
-                    //             'phone' => $number,
-                    //         ]),
+                    'telData' => fn($pool) => $pool->withHeaders([
+                        'Content-Type' => 'application/json',
+                    ])->timeout(30)->post($urls['telegram'], [
+                                'phone' => $number,
+                            ]),
 
 
                     // 'allData' => fn($pool) => $pool->withHeaders([
@@ -79,18 +79,18 @@ class ApiServiceController extends Controller
                         'x-rapidapi-host' => env('SOCIAL_MEDIA_API_HOST'),
                     ])->timeout(30)->get($urls['socialmedia'] . "/?phone={$number}"),
 
-                    // 'sKData' => fn($pool) => $pool->withHeaders([
-                    //     'Content-Type' => 'application/json',
-                    //     'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
-                    // ])->timeout(30)->post($urls['spkyc'], [
-                    //             'mobile' => $localNumber,
-                    //         ]),
-                    // 'suData' => fn($pool) => $pool->withHeaders([
-                    //     'Content-Type' => 'application/json',
-                    //     'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
-                    // ])->timeout(30)->post($urls['spupi'], [
-                    //             'mobile_number' => $localNumber,
-                    //         ]),
+                    'sKData' => fn($pool) => $pool->withHeaders([
+                        'Content-Type' => 'application/json',
+                        'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
+                    ])->timeout(30)->post($urls['spkyc'], [
+                                'mobile' => $localNumber,
+                            ]),
+                    'suData' => fn($pool) => $pool->withHeaders([
+                        'Content-Type' => 'application/json',
+                        'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
+                    ])->timeout(30)->post($urls['spupi'], [
+                                'mobile_number' => $localNumber,
+                            ]),
 
                     // 'sbData' => fn($pool) => $pool->withHeaders([
                     //     'Content-Type' => 'application/json',
@@ -98,12 +98,12 @@ class ApiServiceController extends Controller
                     // ])->timeout(30)->post($urls['spbank'], [
                     //             'mobile_no' => $localNumber,
                     //         ]),
-                    // 'srData' => fn($pool) => $pool->withHeaders([
-                    //     'Content-Type' => 'application/json',
-                    //     'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
-                    // ])->timeout(30)->post($urls['sprc'], [
-                    //             'mobile_number' => $localNumber,
-                    //         ]),
+                    'srData' => fn($pool) => $pool->withHeaders([
+                        'Content-Type' => 'application/json',
+                        'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
+                    ])->timeout(30)->post($urls['sprc'], [
+                                'mobile_number' => $localNumber,
+                            ]),
 
                 ];
                 $responses = Http::pool(fn($pool) => array_map(fn($req) => $req($pool), $requests));
@@ -408,43 +408,198 @@ class ApiServiceController extends Controller
 
     private function handleCorporateGstin($data)
     {
-        return response()->json(['message' => 'Handled corporate_gstin', 'data' => $data]);
+        $idNumber = $data['id_number'] ?? null;
+        if (!$idNumber) {
+            return response()->json(['error' => 'ID number is required'], 400);
+        }
+        $idNumber = strtoupper(trim($idNumber));
+        if (!preg_match('/^[A-Z0-9]+$/', $idNumber)) {
+            return response()->json(['error' => 'Invalid ID number format'], 400);
+        }
+
+        try {
+            $response = Http::withHeaders([
+                'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
+                'Content-Type' => 'application/json',
+            ])->post(env('CORPORATE_GSTIN_URL'), [
+                        'id_number' => $idNumber,
+                    ]);
+
+            return $this->handleSurepassResponse($response);
+        } catch (\Exception $e) {
+            return $this->handleException($e);
+        }
     }
 
     private function handleCreditReport($data)
     {
-        // Validate and process $data as needed
-        return response()->json(['message' => 'Handled credit_report', 'data' => $data]);
+        $required = ['mobile', 'pan', 'name', 'gender', 'consent'];
+        foreach ($required as $field) {
+            if (empty($data[$field])) {
+                return response()->json(['error' => "Missing required field: {$field}"], 422);
+            }
+        }
+
+        try {
+            $response = Http::withHeaders([
+                'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
+                'Content-Type' => 'application/json',
+            ])->post(env('CORPORATE_CREDIT_URL'), [
+                        'mobile' => $data['mobile'],
+                        'pan' => $data['pan'],
+                        'name' => $data['name'],
+                        'gender' => $data['gender'],
+                        'consent' => $data['consent'],
+                    ]);
+
+            if (str_contains($response->header('Content-Type'), 'application/pdf')) {
+                return response($response->body(), 200, [
+                    'Content-Type' => 'application/pdf',
+                    'Content-Disposition' => 'attachment; filename="cibil_report_' . now()->format('Ymd_His') . '.pdf"'
+                ]);
+            }
+
+            return $this->handleSurepassResponse($response);
+        } catch (\Exception $e) {
+            return $this->handleException($e);
+        }
     }
 
     private function handleCorporateCin($data)
     {
-        // Validate and process $data as needed
-        return response()->json(['message' => 'Handled corporate_cin', 'data' => $data]);
+        $cin = $data['id_number'] ?? null;
+        if (!$cin) {
+            return response()->json(['error' => 'CIN is required'], 400);
+        }
+        $cin = strtoupper(trim($cin));
+
+        try {
+            $response = Http::withHeaders([
+                'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
+                'Content-Type' => 'application/json',
+            ])->post(env('CORPORATE_CIN_URL'), [
+                        'id_number' => $cin,
+                    ]);
+
+            return $this->handleSurepassResponse($response);
+        } catch (\Exception $e) {
+            return $this->handleException($e);
+        }
     }
 
     private function handleGstIntel($data)
     {
-        // Validate and process $data as needed
-        return response()->json(['message' => 'Handled gst_intel', 'data' => $data]);
+        $gst = $data['id_number'] ?? null;
+        if (!$gst) {
+            return response()->json(['error' => 'GST number is required'], 400);
+        }
+        $gst = strtoupper(trim($gst));
+        if (!preg_match('/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}[Z]{1}[0-9A-Z]{1}$/', $gst)) {
+            return response()->json(['error' => 'Invalid GST number format'], 400);
+        }
+
+        try {
+            $response = Http::withHeaders([
+                'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
+                'Content-Type' => 'application/json',
+            ])->post(env('GST_INTEL_URL'), [
+                        'id_number' => $gst,
+                    ]);
+
+            return $this->handleSurepassResponse($response);
+        } catch (\Exception $e) {
+            return $this->handleException($e);
+        }
     }
 
     private function handleEmploymentHistory($data)
     {
-        // Validate and process $data as needed
-        return response()->json(['message' => 'Handled employment_history', 'data' => $data]);
+        $idNumber = $data['id_number'] ?? null;
+        if (!$idNumber) {
+            return response()->json(['error' => 'ID number is required'], 400);
+        }
+        $idNumber = strtoupper(trim($idNumber));
+
+        try {
+            $response = Http::withHeaders([
+                'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
+                'Content-Type' => 'application/json',
+            ])->post(env('EMPLOYMENT_HISTORY_URL'), [
+                        'id_number' => $idNumber,
+                    ]);
+
+            return $this->handleSurepassResponse($response);
+        } catch (\Exception $e) {
+            return $this->handleException($e);
+        }
     }
 
     private function handleFindUan($data)
     {
-        // Validate and process $data as needed
-        return response()->json(['message' => 'Handled find_uan', 'data' => $data]);
+        $mobile = $this->sanitizePhoneNumber($data['mobile_number'] ?? '');
+        if (strlen($mobile) < 10 || strlen($mobile) > 15) {
+            return response()->json(['error' => 'Invalid mobile number'], 400);
+        }
+
+        try {
+            $response = Http::withHeaders([
+                'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
+                'Content-Type' => 'application/json',
+            ])->post(env('FIND_UAN_URL'), [
+                        'mobile_number' => $mobile,
+                    ]);
+
+            return $this->handleSurepassResponse($response);
+        } catch (\Exception $e) {
+            return $this->handleException($e);
+        }
     }
 
     private function handlePanToUan($data)
     {
-        // Validate and process $data as needed
-        return response()->json(['message' => 'Handled pan_to_uan', 'data' => $data]);
+        $pan = strtoupper(trim($data['pan_number'] ?? ''));
+        if (!preg_match('/^[A-Z]{5}[0-9]{4}[A-Z]$/', $pan)) {
+            return response()->json(['error' => 'Invalid PAN number format'], 400);
+        }
+
+        try {
+            $response = Http::withHeaders([
+                'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
+                'Content-Type' => 'application/json',
+            ])->post(env('PAN_TO_UAN_URL'), [
+                        'pan_number' => $pan,
+                    ]);
+
+            return $this->handleSurepassResponse($response);
+        } catch (\Exception $e) {
+            return $this->handleException($e);
+        }
     }
+
+    private function handleSurepassResponse($response)
+    {
+        if ($response->successful()) {
+            return response()->json($response->json());
+        } else {
+            Log::error('Surepass API error', [
+                'status' => $response->status(),
+                'body' => $response->json(),
+            ]);
+            return response()->json([
+                'error' => 'Surepass API error',
+                'details' => $response->json(),
+            ], $response->status());
+        }
+    }
+
+    private function handleException($e)
+    {
+        Log::error('Surepass Exception', ['message' => $e->getMessage()]);
+        return response()->json([
+            'error' => 'Server error',
+            'message' => $e->getMessage(),
+        ], 500);
+    }
+
 
 }

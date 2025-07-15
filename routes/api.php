@@ -8,7 +8,7 @@ use App\Http\Controllers\Auth\VerifyEmailController;
 use App\Http\Controllers\GoogleAuthController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ReportController;
-use App\Http\Controllers\CashfreeSubscriptionController;
+
 
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
@@ -31,7 +31,7 @@ Route::middleware(['auth:sanctum', 'token.expire'])->get('/user', function (Requ
 });
 
 Route::middleware(['auth:sanctum', 'token.expire'])->post('/logout', [AuthController::class, 'logout']);
-Route::middleware(['auth:sanctum', 'token.expire'])->post('/cashfree/create-order', [CashfreeSubscriptionController::class, 'createOrder']);
+
 
 
 // API SERVICE ROUTES (Secured with `auth:sanctum` & Rate Limiting)

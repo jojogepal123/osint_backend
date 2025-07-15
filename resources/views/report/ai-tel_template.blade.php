@@ -126,14 +126,6 @@
 </head>
 
 <body>
-
-    <h1>AI OSINT Report</h1>
-
-    <div class="section">
-        <p><strong>Input:</strong> {{ $userInput }}</p>
-        <p><strong>Type:</strong> {{ ucfirst($type) }}</p>
-        <p><strong>Generated At:</strong> {{ $generation_time }}</p>
-    </div>
     <div class="section highlight" style="border-left: 6px solid #f59e0b;">
         <h2 style="color: #b45309;">CONFIDENTIAL – FOR AUTHORIZED LAW ENFORCEMENT PERSONNEL ONLY</h2>
         <p>This report is intended strictly for legitimate investigative use by authorized law enforcement officers, in
@@ -152,6 +144,14 @@
             personal data. It assumes no liability for the unauthorized use, distribution, or interpretation of the
             information contained in this report.</p>
     </div>
+    <h1>AI OSINT Report</h1>
+
+    <div class="section">
+        <p><strong>Input:</strong> {{ $userInput }}</p>
+        <p><strong>Type:</strong> {{ ucfirst($type) }}</p>
+        <p><strong>Generated At:</strong> {{ $generation_time }}</p>
+    </div>
+
     @if($summary)
         <div class="section">
             <h2>[Summary] Intelligence Summary</h2>
