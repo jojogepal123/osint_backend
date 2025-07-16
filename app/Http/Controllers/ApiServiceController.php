@@ -39,7 +39,7 @@ class ApiServiceController extends Controller
                 'socialmedia' => env('SOCIALMEDIADATA_URL'),
                 'spkyc' => env('SPKYC_URL'),
                 'spupi' => env('SPUPI_URL'),
-                'spbank' => env('SPBANK_URL'),
+                // 'spbank' => env('SPBANK_URL'),
                 'sprc' => env('SPRC_URL'),
 
             ];
