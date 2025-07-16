@@ -125,9 +125,11 @@ class ReportController extends Controller
             ->post(
                 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' . env('GEMINI_API_KEY'),
                 [
-                    'contents' => [[
-                        'parts' => [['text' => $prompt]]
-                    ]]
+                    'contents' => [
+                        [
+                            'parts' => [['text' => $prompt]]
+                        ]
+                    ]
                 ]
             );
 
@@ -189,4 +191,58 @@ class ReportController extends Controller
             ->header('Content-Type', 'application/pdf')
             ->header('Content-Disposition', "attachment; filename={$filename}");
     }
+    // public function generateRcReport(Request $request)
+    // {
+    //     $validated = $request->validate([
+    //         'data' => ['required', 'array'],
+    //     ]);
+
+    //     $data = $validated['data'];
+    //     $filename = 'rc_report_' . now()->format('Ymd_His') . '_' . Str::uuid() . '.pdf';
+    //     $filePath = storage_path("app/private/reports/{$filename}");
+
+    //     // Ensure directory exists
+    //     Storage::makeDirectory('private/reports');
+
+    //     try {
+    //         $html = View::make('report.rc_template', compact('data'))->render();
+    //         $pdf = Pdf::loadHTML($html)->setPaper('a4');
+    //         $pdf->save($filePath);
+
+    //         return response()->download($filePath, $filename)->deleteFileAfterSend(true);
+    //     } catch (\Exception $e) {
+    //         \Log::error("RC PDF generation failed: " . $e->getMessage());
+    //         return response()->json(['error' => 'PDF generation failed'], 500);
+    //     }
+    // }
+    public function generateRcReport(Request $request)
+    {
+        $validated = $request->validate([
+            'data' => ['required', 'array'],
+        ]);
+
+        $data = array_filter($validated['data'], function ($value, $key) {
+            $key = strtolower($key);
+            if (in_array($key, ['client_id', 'clientid']))
+                return false;
+            if (is_null($value) || $value === '')
+                return false;
+            $v = strtolower(trim((string) $value));
+            return !in_array($v, ['n/a', 'na', 'n.a']);
+        }, ARRAY_FILTER_USE_BOTH);
+
+        $filename = 'rc_details_' . now()->format('Ymd_His') . '_' . Str::uuid() . '.pdf';
+        $filePath = storage_path("app/private/reports/{$filename}");
+        \Storage::makeDirectory('private/reports');
+
+        try {
+            $html = View::make('report.rc_template', compact('data'))->render();
+            Pdf::loadHTML($html)->save($filePath);
+            return response()->download($filePath, $filename);
+        } catch (\Exception $e) {
+            \Log::error("RC PDF generation error: " . $e->getMessage());
+            return response()->json(['error' => 'PDF generation failed'], 500);
+        }
+    }
+
 }
