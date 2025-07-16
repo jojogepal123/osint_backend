@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+// use Google\Service\Storage;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use HlrLookup\HLRLookupClient;
@@ -9,6 +10,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Arr;
 use Illuminate\Http\Client\ConnectionException;
 use GuzzleHttp\Exception\RequestException; // Import this
+use Illuminate\Support\Facades\Storage;
 
 class ApiServiceController extends Controller
 {
@@ -421,7 +423,7 @@ class ApiServiceController extends Controller
             $response = Http::withHeaders([
                 'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
                 'Content-Type' => 'application/json',
-            ])->post(env('CORPORATE_GSTIN_URL'), [
+            ])->timeout(30)->post(env('CORPORATE_GSTIN_URL'), [
                         'id_number' => $idNumber,
                     ]);
 
@@ -434,6 +436,7 @@ class ApiServiceController extends Controller
     private function handleCreditReport($data)
     {
         $required = ['mobile', 'pan', 'name', 'gender', 'consent'];
+        $mobile = $data['mobile'];
         foreach ($required as $field) {
             if (empty($data[$field])) {
                 return response()->json(['error' => "Missing required field: {$field}"], 422);
@@ -444,7 +447,7 @@ class ApiServiceController extends Controller
             $response = Http::withHeaders([
                 'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
                 'Content-Type' => 'application/json',
-            ])->post(env('CORPORATE_CREDIT_URL'), [
+            ])->timeout(30)->post(env('CORPORATE_CREDIT_URL'), [
                         'mobile' => $data['mobile'],
                         'pan' => $data['pan'],
                         'name' => $data['name'],
@@ -452,10 +455,28 @@ class ApiServiceController extends Controller
                         'consent' => $data['consent'],
                     ]);
 
-            if (str_contains($response->header('Content-Type'), 'application/pdf')) {
-                return response($response->body(), 200, [
+            if ($response->successful()) {
+                $json = $response->json();
+                $pdfUrl = $json['data']['credit_report_link'] ?? null;
+                if (!$pdfUrl) {
+                    return response()->json(['error' => 'Credit report not found for this search'], 422);
+                }
+                $pdfResponse = Http::timeout(30)->get($pdfUrl);
+                if (!$pdfResponse->successful()) {
+                    return response()->json(['error' => 'Failed to download credit report'], 500);
+                }
+                // Save the PDF to storage
+                Storage::makeDirectory('cibil_reports');
+                $filename = 'cibil_report_' . $mobile . '_' . now()->format('Ymd_His') . '.pdf';
+                $filePath = "cibil_reports/{$filename}";
+                Storage::put($filePath, $pdfResponse->body());
+                Log::info('CIBIL Report Generated', [
+                    'filename' => $filename,
+                    'size' => strlen($pdfResponse->body()),
+                ]);
+                return response($pdfResponse->body(), 200, [
                     'Content-Type' => 'application/pdf',
-                    'Content-Disposition' => 'attachment; filename="cibil_report_' . now()->format('Ymd_His') . '.pdf"'
+                    'Content-Disposition' => 'attachment; filename="' . $filename . '"'
                 ]);
             }
 
@@ -477,7 +498,7 @@ class ApiServiceController extends Controller
             $response = Http::withHeaders([
                 'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
                 'Content-Type' => 'application/json',
-            ])->post(env('CORPORATE_CIN_URL'), [
+            ])->timeout(30)->post(env('CORPORATE_CIN_URL'), [
                         'id_number' => $cin,
                     ]);
 
@@ -502,7 +523,7 @@ class ApiServiceController extends Controller
             $response = Http::withHeaders([
                 'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
                 'Content-Type' => 'application/json',
-            ])->post(env('GST_INTEL_URL'), [
+            ])->timeout(30)->post(env('GST_INTEL_URL'), [
                         'id_number' => $gst,
                     ]);
 
@@ -524,7 +545,7 @@ class ApiServiceController extends Controller
             $response = Http::withHeaders([
                 'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
                 'Content-Type' => 'application/json',
-            ])->post(env('EMPLOYMENT_HISTORY_URL'), [
+            ])->timeout(30)->post(env('EMPLOYMENT_HISTORY_URL'), [
                         'id_number' => $idNumber,
                     ]);
 
@@ -545,7 +566,7 @@ class ApiServiceController extends Controller
             $response = Http::withHeaders([
                 'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
                 'Content-Type' => 'application/json',
-            ])->post(env('FIND_UAN_URL'), [
+            ])->timeout(30)->post(env('FIND_UAN_URL'), [
                         'mobile_number' => $mobile,
                     ]);
 
@@ -566,7 +587,7 @@ class ApiServiceController extends Controller
             $response = Http::withHeaders([
                 'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
                 'Content-Type' => 'application/json',
-            ])->post(env('PAN_TO_UAN_URL'), [
+            ])->timeout(30)->post(env('PAN_TO_UAN_URL'), [
                         'pan_number' => $pan,
                     ]);
 
@@ -580,16 +601,24 @@ class ApiServiceController extends Controller
     {
         if ($response->successful()) {
             return response()->json($response->json());
-        } else {
-            Log::error('Surepass API error', [
-                'status' => $response->status(),
-                'body' => $response->json(),
-            ]);
-            return response()->json([
-                'error' => 'Surepass API error',
-                'details' => $response->json(),
-            ], $response->status());
         }
+
+        Log::error('Surepass API error', [
+            'status' => $response->status(),
+            'body' => $response->json(),
+        ]);
+
+        if ($response->status() === 422) {
+            return response()->json([
+                'error' => 'No data found',
+                'details' => $response->json(),
+            ], 422);
+        }
+
+        return response()->json([
+            'error' => 'Surepass API error',
+            'details' => $response->json(),
+        ], $response->status());
     }
 
     private function handleException($e)

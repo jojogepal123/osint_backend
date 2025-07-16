@@ -21,13 +21,13 @@ class ExpireSanctumToken
                 $secondsToExpire = $minutesToExpire * 60;
 
                 // Log token creation and current time for debugging
-                Log::info('Sanctum Token Check', [
-                    'token_id' => $accessToken->id,
-                    'created_at' => $accessToken->created_at->toDateTimeString(),
-                    'now' => now()->toDateTimeString(),
-                    'diff_seconds' => $accessToken->created_at->diffInSeconds(now()),
-                    'expires_in_seconds' => $secondsToExpire,
-                ]);
+                // Log::info('Sanctum Token Check', [
+                //     'token_id' => $accessToken->id,
+                //     'created_at' => $accessToken->created_at->toDateTimeString(),
+                //     'now' => now()->toDateTimeString(),
+                //     'diff_seconds' => $accessToken->created_at->diffInSeconds(now()),
+                //     'expires_in_seconds' => $secondsToExpire,
+                // ]);
 
                 if ($accessToken->created_at->diffInSeconds(now()) >= $secondsToExpire) {
                     Log::warning('Sanctum token expired and deleted', [
