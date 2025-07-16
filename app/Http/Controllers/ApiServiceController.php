@@ -37,7 +37,7 @@ class ApiServiceController extends Controller
                 'socialmedia' => env('SOCIALMEDIADATA_URL'),
                 'spkyc' => env('SPKYC_URL'),
                 'spupi' => env('SPUPI_URL'),
-                'spbank' => env('SPBANK_URL'),
+                // 'spbank' => env('SPBANK_URL'),
                 'sprc' => env('SPRC_URL'),
             ];
 
@@ -91,12 +91,12 @@ class ApiServiceController extends Controller
                                 'mobile_number' => $localNumber,
                             ]),
 
-                    'sbData' => fn($pool) => $pool->withHeaders([
-                        'Content-Type' => 'application/json',
-                        'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
-                    ])->timeout(30)->post($urls['spbank'], [
-                                'mobile_no' => $localNumber,
-                            ]),
+                    // 'sbData' => fn($pool) => $pool->withHeaders([
+                    //     'Content-Type' => 'application/json',
+                    //     'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
+                    // ])->timeout(30)->post($urls['spbank'], [
+                    //             'mobile_no' => $localNumber,
+                    //         ]),
                     'srData' => fn($pool) => $pool->withHeaders([
                         'Content-Type' => 'application/json',
                         'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
