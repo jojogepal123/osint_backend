@@ -191,30 +191,35 @@ class ReportController extends Controller
             ->header('Content-Type', 'application/pdf')
             ->header('Content-Disposition', "attachment; filename={$filename}");
     }
-    // public function generateRcReport(Request $request)
-    // {
-    //     $validated = $request->validate([
-    //         'data' => ['required', 'array'],
-    //     ]);
+    public function generateUpiReport(Request $request)
+    {
+        $validated = $request->validate([
+            'data' => ['required', 'array'],
+        ]);
 
-    //     $data = $validated['data'];
-    //     $filename = 'rc_report_' . now()->format('Ymd_His') . '_' . Str::uuid() . '.pdf';
-    //     $filePath = storage_path("app/private/reports/{$filename}");
+        $data = array_filter($validated['data'], function ($value, $key) {
+            $key = strtolower($key);
+            if (in_array($key, ['client_id', 'clientid']))
+                return false;
+            if (is_null($value) || $value === '')
+                return false;
+            $v = strtolower(trim((string) $value));
+            return !in_array($v, ['n/a', 'na', 'n.a']);
+        }, ARRAY_FILTER_USE_BOTH);
 
-    //     // Ensure directory exists
-    //     Storage::makeDirectory('private/reports');
+        $filename = 'upi_details_' . now()->format('Ymd_His') . '_' . Str::uuid() . '.pdf';
+        $filePath = storage_path("app/private/reports/{$filename}");
+        \Storage::makeDirectory('private/reports');
 
-    //     try {
-    //         $html = View::make('report.rc_template', compact('data'))->render();
-    //         $pdf = Pdf::loadHTML($html)->setPaper('a4');
-    //         $pdf->save($filePath);
-
-    //         return response()->download($filePath, $filename)->deleteFileAfterSend(true);
-    //     } catch (\Exception $e) {
-    //         \Log::error("RC PDF generation failed: " . $e->getMessage());
-    //         return response()->json(['error' => 'PDF generation failed'], 500);
-    //     }
-    // }
+        try {
+            $html = View::make('report.upi_template', compact('data'))->render();
+            Pdf::loadHTML($html)->save($filePath);
+            return response()->download($filePath, $filename);
+        } catch (\Exception $e) {
+            \Log::error("UPI PDF generation error: " . $e->getMessage());
+            return response()->json(['error' => 'PDF generation failed'], 500);
+        }
+    }
     public function generateRcReport(Request $request)
     {
         $validated = $request->validate([
