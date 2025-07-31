@@ -41,8 +41,6 @@ class ReportController extends Controller
         Storage::makeDirectory('/reports');
         // log::info($data);
 
-        Log::info($data);
-
         // Render view based on type
         if ($type === 'tel') {
             $html = View::make('report.tel_template', compact('data'))->render();
@@ -191,30 +189,7 @@ class ReportController extends Controller
             ->header('Content-Type', 'application/pdf')
             ->header('Content-Disposition', "attachment; filename={$filename}");
     }
-    // public function generateRcReport(Request $request)
-    // {
-    //     $validated = $request->validate([
-    //         'data' => ['required', 'array'],
-    //     ]);
 
-    //     $data = $validated['data'];
-    //     $filename = 'rc_report_' . now()->format('Ymd_His') . '_' . Str::uuid() . '.pdf';
-    //     $filePath = storage_path("app/private/reports/{$filename}");
-
-    //     // Ensure directory exists
-    //     Storage::makeDirectory('private/reports');
-
-    //     try {
-    //         $html = View::make('report.rc_template', compact('data'))->render();
-    //         $pdf = Pdf::loadHTML($html)->setPaper('a4');
-    //         $pdf->save($filePath);
-
-    //         return response()->download($filePath, $filename)->deleteFileAfterSend(true);
-    //     } catch (\Exception $e) {
-    //         \Log::error("RC PDF generation failed: " . $e->getMessage());
-    //         return response()->json(['error' => 'PDF generation failed'], 500);
-    //     }
-    // }
     public function generateRcReport(Request $request)
     {
         $validated = $request->validate([
@@ -233,14 +208,14 @@ class ReportController extends Controller
 
         $filename = 'rc_details_' . now()->format('Ymd_His') . '_' . Str::uuid() . '.pdf';
         $filePath = storage_path("app/private/reports/{$filename}");
-        \Storage::makeDirectory('private/reports');
+        Storage::makeDirectory('private/reports');
 
         try {
             $html = View::make('report.rc_template', compact('data'))->render();
             Pdf::loadHTML($html)->save($filePath);
             return response()->download($filePath, $filename);
         } catch (\Exception $e) {
-            \Log::error("RC PDF generation error: " . $e->getMessage());
+            Log::error("RC PDF generation error: " . $e->getMessage());
             return response()->json(['error' => 'PDF generation failed'], 500);
         }
     }
