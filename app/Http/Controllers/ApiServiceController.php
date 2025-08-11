@@ -9,8 +9,10 @@ use HlrLookup\HLRLookupClient;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Arr;
 use Illuminate\Http\Client\ConnectionException;
-use GuzzleHttp\Exception\RequestException; // Import this
+use GuzzleHttpException\RequestException; // Import this
 use Illuminate\Support\Facades\Storage;
+use Exception;
+use Throwable;
 
 class ApiServiceController extends Controller
 {
@@ -76,10 +78,10 @@ class ApiServiceController extends Controller
                     //     'x-rapidapi-key' => env('ALL_MOBILE_API_KEY'),
                     // ])->timeout(30)->get($urls['allmobile'] . "/{$number}"),
 
-                    'smData' => fn($pool) => $pool->withHeaders([
-                        'x-rapidapi-key' => env('SOCIAL_MEDIA_API_KEY'),
-                        'x-rapidapi-host' => env('SOCIAL_MEDIA_API_HOST'),
-                    ])->timeout(30)->get($urls['socialmedia'] . "/?phone={$number}"),
+                    // 'smData' => fn($pool) => $pool->withHeaders([
+                    //     'x-rapidapi-key' => env('SOCIAL_MEDIA_API_KEY'),
+                    //     'x-rapidapi-host' => env('SOCIAL_MEDIA_API_HOST'),
+                    // ])->timeout(30)->get($urls['socialmedia'] . "/?phone={$number}"),
 
                     'sKData' => fn($pool) => $pool->withHeaders([
                         'Content-Type' => 'application/json',
@@ -110,7 +112,7 @@ class ApiServiceController extends Controller
 
                 ];
                 $responses = Http::pool(fn($pool) => array_map(fn($req) => $req($pool), $requests));
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 Log::error('API Pool Request Error', [
                     'number' => $number,
                     'message' => $e->getMessage(),
@@ -132,9 +134,9 @@ class ApiServiceController extends Controller
                     $hlrData = $hlrResponse->responseBody;
                     $data['hlrData'] = $hlrData;
                 } else {
-                    throw new \Exception("HLR API HTTP Status: {$hlrResponse->httpStatusCode}");
+                    throw new Exception("HLR API HTTP Status: {$hlrResponse->httpStatusCode}");
                 }
-            } catch (\Throwable $th) {
+            } catch (Throwable $th) {
                 Log::error('HLR API Error', [
                     'number' => $number,
                     'error' => $th->getMessage(),
@@ -144,7 +146,7 @@ class ApiServiceController extends Controller
             foreach (array_keys($requests) as $index => $key) {
                 $response = $responses[$index];
 
-                if ($response instanceof \Throwable) {
+                if ($response instanceof Throwable) {
                     Log::error("[$key] API Exception", [
                         'type' => get_class($response),
                         'message' => $response->getMessage(),
@@ -164,14 +166,14 @@ class ApiServiceController extends Controller
                         ]);
                         $data[$key] = null;
                     }
-                } catch (\Throwable $e) {
+                } catch (Throwable $e) {
                     Log::error("[$key] Unexpected error", ['message' => $e->getMessage()]);
                     $data[$key] = null;
                 }
             }
             
             return response()->json($data);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error('Global Phone API Error (Caught outside API calls)', [
                 'number' => $request->query('phone'),
                 'error' => $e->getMessage(),
@@ -227,7 +229,7 @@ class ApiServiceController extends Controller
                     ])->timeout(30)->get($urls['hibp'], ['truncateResponse' => 'false']),
                 ];
                 $responses = Http::pool(fn($pool) => array_map(fn($req) => $req($pool), $requests));
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 // This catches other request-related errors (e.g., malformed URL, other Guzzle errors)
                 Log::error('API Pool Request Error', [
                     'email' => $email,
@@ -239,7 +241,7 @@ class ApiServiceController extends Controller
             foreach (array_keys($requests) as $index => $key) {
                 $response = $responses[$index];
 
-                if ($response instanceof \Throwable) {
+                if ($response instanceof Throwable) {
                     // Handle exceptions like timeout, DNS failure, etc.
                     Log::error("[$key] API Exception", [
                         'type' => get_class($response),
@@ -272,13 +274,13 @@ class ApiServiceController extends Controller
                         ]);
                         $data[$key] = null;
                     }
-                } catch (\Throwable $e) {
+                } catch (Throwable $e) {
                     Log::error("[$key] Unexpected error", ['message' => $e->getMessage()]);
                     $data[$key] = null;
                 }
             }
             return response()->json($data);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             // This catches validation errors, or any other unexpected errors outside the API calls
             Log::error('Global Email API Error (Caught outside API calls)', [
                 'email' => $request->query('email'),
@@ -289,7 +291,42 @@ class ApiServiceController extends Controller
         }
     }
 
+    public function getUpiFullDetails(Request $request)
+    {
+        $request->validate([
+            'upi_id' => ['required', 'string'],
+        ]);
 
+        $upiId = $request->input('upi_id');
+        Log::debug('Surepass UPI Full Lookup Request', [
+            'upi_id' => $upiId,
+        ]);
+
+        try {
+            $response = Http::withHeaders([
+                'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
+                'Content-Type' => 'application/json',
+            ])->timeout(30)->post(env('SPUPI_FULL_URL'), [
+                        'upi_id' => $upiId,
+                    ]);
+
+            if ($response->successful()) {
+                return response()->json($response->json());
+            } else {
+                return response()->json([
+                    'error' => 'Failed to fetch UPI details',
+                    'status' => $response->status(),
+                    'body' => $response->body()
+                ], $response->status());
+            }
+        } catch (Throwable $e) {
+            \Log::error('Surepass UPI Full Lookup Error', [
+                'error' => $e->getMessage(),
+                'upi_id' => $upiId,
+            ]);
+            return response()->json(['error' => 'Server error occurred.'], 500);
+        }
+    }
 
     public function getRcFullDetails(Request $request)
     {
@@ -319,7 +356,7 @@ class ApiServiceController extends Controller
                     'body' => $response->body()
                 ], $response->status());
             }
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             \Log::error('Surepass RC Full Lookup Error', [
                 'error' => $e->getMessage(),
                 'id_number' => $idNumber,
@@ -371,7 +408,7 @@ class ApiServiceController extends Controller
             } else {
                 return response()->json(['error' => 'Failed to fetch data from API'], 500);
             }
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error('Leak Data Finder Error', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
@@ -429,7 +466,7 @@ class ApiServiceController extends Controller
                     ]);
 
             return $this->handleSurepassResponse($response);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return $this->handleException($e);
         }
     }
@@ -482,7 +519,7 @@ class ApiServiceController extends Controller
             }
 
             return $this->handleSurepassResponse($response);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return $this->handleException($e);
         }
     }
@@ -504,7 +541,7 @@ class ApiServiceController extends Controller
                     ]);
 
             return $this->handleSurepassResponse($response);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return $this->handleException($e);
         }
     }
@@ -529,7 +566,7 @@ class ApiServiceController extends Controller
                     ]);
 
             return $this->handleSurepassResponse($response);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return $this->handleException($e);
         }
     }
@@ -551,7 +588,7 @@ class ApiServiceController extends Controller
                     ]);
 
             return $this->handleSurepassResponse($response);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return $this->handleException($e);
         }
     }
@@ -572,7 +609,7 @@ class ApiServiceController extends Controller
                     ]);
 
             return $this->handleSurepassResponse($response);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return $this->handleException($e);
         }
     }
@@ -593,7 +630,7 @@ class ApiServiceController extends Controller
                     ]);
 
             return $this->handleSurepassResponse($response);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return $this->handleException($e);
         }
     }
@@ -630,6 +667,407 @@ class ApiServiceController extends Controller
             'message' => $e->getMessage(),
         ], 500);
     }
+    public function verificationIdData(Request $request)
+    {
+        // Log::info('Verification request received', [
+        //     'type' => $request->input('type'),
+        //     'data' => $request->input('data')
+        // ]);
 
+        $type = $request->input('type');
+        $data = $request->input('data');
+
+        if (!$type || !$data) {
+            Log::error('Missing type or data in request');
+            return response()->json(['error' => 'Invalid search request'], 400);
+        }
+
+        switch ($type) {
+            case 'pan':
+                return $this->handlePanVerification($data);
+            case 'voter_id':
+                return $this->handleVoterIdVerification($data);
+            case 'employment':
+                return $this->handleEmploymentVerification($data);
+            case 'bank_account':
+                return $this->handleBankAccountVerification($data);
+            case 'passport':
+                return $this->handlePassportVerification($data);
+            case 'vehicle_rc':
+                return $this->handleVehicleRcVerification($data);
+            case 'ifsc':
+                return $this->handleIfscVerification($data);
+            case 'driving_license':
+                return $this->handleDrivingLicenseVerification($data);
+            default:
+                return response()->json(['error' => 'Invalid verification type'], 400);
+        }
+    }
+
+    private function generateSignature()
+    {
+        try {
+            $clientId = env('CASHFREE_CLIENT_ID');
+            $timestamp = time();
+            $data = $clientId . '.' . $timestamp;
+
+            $publicKeyPath = storage_path('app/cashfree_public_key.pem');
+
+            if (!file_exists($publicKeyPath)) {
+                Log::error('Public key file not found');
+                return null;
+            }
+
+            $publicKeyContent = file_get_contents($publicKeyPath);
+            $publicKey = openssl_pkey_get_public($publicKeyContent);
+
+            if (!$publicKey) {
+                Log::error('Invalid public key format');
+                return null;
+            }
+
+            if (openssl_public_encrypt($data, $encrypted, $publicKey, OPENSSL_PKCS1_OAEP_PADDING)) {
+                return base64_encode($encrypted);
+            }
+
+            return null;
+        } catch (Exception $e) {
+            Log::error('Signature generation failed: ' . $e->getMessage());
+            return null;
+        }
+    }
+
+    private function getHeaders()
+    {
+        $signature = $this->generateSignature();
+
+        if (!$signature) {
+            // If signature fails, you MUST whitelist IP
+            Log::error('Signature generation failed - IP whitelisting required');
+            throw new Exception('Authentication failed: Either whitelist IP or fix signature generation');
+        }
+
+        return [
+            'Content-Type' => 'application/json',
+            'x-client-id' => env('CASHFREE_CLIENT_ID'),
+            'x-client-secret' => env('CASHFREE_CLIENT_SECRET'),
+            'x-cf-signature' => $signature,
+        ];
+    }
+    private function handleBankAccountVerification($data)
+    {
+
+        $accountNumber = $data['account_number'] ?? null;
+        $ifsc = $data['ifsc'] ?? null;
+        $name = $data['name'] ?? null;
+        $phone = $data['phone'] ?? null;
+
+        if (!$accountNumber || !$ifsc) {
+            return response()->json(['error' => 'Account number and IFSC are required'], 400);
+        }
+
+        $payload = [
+            'bank_account' => $accountNumber,
+            'ifsc' => $ifsc,
+        ];
+        if (!empty($name)) {
+            $payload['name'] = $name;
+        }
+        if (!empty($phone)) {
+            $payload['phone'] = $phone;
+        }
+
+
+        try {
+            $response = Http::withHeaders($this->getHeaders())
+                ->timeout(30)
+                ->post(env('BANK_VERIFICATION_URL'), $payload);
+
+            // Log::info('Bank Account API Response', [
+            //     'status' => $response->status(),
+            //     'body' => $response->body()
+            // ]);
+
+            if ($response->successful()) {
+                return response()->json([
+                    'success' => true,
+                    'data' => $response->json()
+                ]);
+            }
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Bank verification failed',
+                'error' => $response->json(),
+                'status' => $response->status()
+            ], $response->status());
+
+        } catch (Exception $e) {
+            Log::error('Bank verification error: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Server error occurred',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+    private function handlePanVerification($data)
+    {
+        $pan = strtoupper(trim($data['pan'] ?? ''));
+        if (!preg_match('/^[A-Z]{5}[0-9]{4}[A-Z]$/', $pan)) {
+            Log::error('Invalid PAN format', ['pan' => $pan]);
+            return response()->json(['error' => 'Invalid PAN number format'], 400);
+        }
+
+        $payload = [
+            'pan' => $pan,
+            'verification_id' => 'PAN360_' . uniqid() . '_' . time(),
+        ];
+
+        if (!empty($data['name'])) {
+            $payload['name'] = $data['name'];
+        }
+
+        // Log::info('Making PAN360 verification API call', [
+        //     'url' => env('CASHFREE_BASE_URL') . '/verification/pan/advance',
+        //     'payload' => $payload
+        // ]);
+
+        try {
+            $response = Http::withHeaders($this->getHeaders())
+                ->timeout(30)
+                ->post(env('PAN_VERIFICATION_URL'), $payload);
+
+            // Log::info('PAN360 API Response', [
+            //     'status' => $response->status(),
+            //     'body' => $response->body()
+            // ]);
+
+            return $this->handleResponse($response);
+        } catch (Exception $e) {
+            Log::error('PAN360 verification exception', [
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            return $this->handleVerificationException($e);
+        }
+    }
+
+    private function handleVoterIdVerification($data)
+    {
+        $voterId = strtoupper(trim($data['epic_number'] ?? ''));
+        if (empty($voterId)) {
+            return response()->json(['error' => 'Voter ID is required'], 400);
+        }
+
+        $payload = [
+            'epic_number' => $voterId,
+            'verification_id' => 'VOTER_' . uniqid() . '_' . time(),
+        ];
+        if (!empty($data['name'])) {
+            $payload['name'] = $data['name'];
+        }
+
+        try {
+            $response = Http::withHeaders($this->getHeaders())
+                ->timeout(30)
+                ->post(env('VOTER_ID_VERIFICATION_URL'), $payload);
+
+            return $this->handleResponse($response);
+        } catch (Exception $e) {
+            return $this->handleVerificationException($e);
+        }
+    }
+
+    private function handleEmploymentVerification($data)
+    {
+        $validCombos = [
+            ["phone"],
+            ["uan"],
+            ["phone", "pan"],
+            ["phone", "dob", "employer_name"],
+            ["phone", "employee_name", "employer_name"],
+            ["phone", "dob", "employee_name", "employer_name"],
+            ["phone", "pan", "employee_name", "employer_name"],
+            ["phone", "dob", "pan", "employee_name", "employer_name"],
+            ["uan", "employee_name", "employer_name"],
+            ["uan", "employee_name"],
+            ["dob", "employee_name"],
+            ["dob", "employee_name", "employer_name"],
+        ];
+
+        $isValid = false;
+        foreach ($validCombos as $combo) {
+            $allPresent = true;
+            foreach ($combo as $field) {
+                if (empty($data[$field])) {
+                    $allPresent = false;
+                    break;
+                }
+            }
+            if ($allPresent) {
+                $isValid = true;
+                break;
+            }
+        }
+
+        if (!$isValid) {
+            return response()->json([
+                'error' => 'Please fill all fields for at least one valid combination (e.g. phone + pan, uan + name, etc).'
+            ], 400);
+        }
+
+        $payload = [];
+        foreach (['phone', 'pan', 'uan', 'dob', 'employee_name', 'employer_name'] as $field) {
+            if (!empty($data[$field])) {
+                $payload[$field] = $data[$field];
+            }
+        }
+        $payload['verification_id'] = 'EMP_' . uniqid() . '_' . time();
+
+        if (count($payload) <= 1) { // Only verification_id
+            return response()->json(['error' => 'At least one employment field is required'], 400);
+        }
+
+        try {
+            $response = Http::withHeaders($this->getHeaders())
+                ->timeout(30)
+                ->post(env('EMPLOYMENT_VERIFICATION_URL'), $payload);
+
+            return $this->handleResponse($response);
+        } catch (Exception $e) {
+            return $this->handleVerificationException($e);
+        }
+    }
+
+    private function handlePassportVerification($data)
+    {
+        $passportNumber = strtoupper(trim($data['file_number'] ?? ''));
+        if (empty($passportNumber) || empty($data['dob'])) {
+            return response()->json(['error' => 'Passport/File number and Date of Birth are required'], 400);
+        }
+
+
+        $payload = [
+            'file_number' => $passportNumber,
+            'dob' => $data['dob'],
+            'name' => $data['name'] ?? null,
+            'verification_id' => 'PASS_' . uniqid() . '_' . time(),
+        ];
+
+
+        try {
+            $response = Http::withHeaders($this->getHeaders())
+                ->timeout(30)
+                ->post(env('PASSPORT_VERIFICATION_URL'), $payload);
+
+            return $this->handleResponse($response);
+        } catch (Exception $e) {
+            return $this->handleVerificationException($e);
+        }
+    }
+
+    private function handleVehicleRcVerification($data)
+    {
+        $rcNumber = strtoupper(trim($data['vehicle_number'] ?? ''));
+        if (empty($rcNumber)) {
+            return response()->json(['error' => 'RC number is required'], 400);
+        }
+
+        $payload = [
+            'vehicle_number' => $rcNumber,
+            'verification_id' => 'VRC_' . uniqid() . '_' . time(),
+        ];
+
+        try {
+            $response = Http::withHeaders($this->getHeaders())
+                ->timeout(30)
+                ->post(env('VEHICLE_RC_VERIFICATION_URL'), $payload);
+
+            return $this->handleResponse($response);
+        } catch (Exception $e) {
+            return $this->handleVerificationException($e);
+        }
+    }
+
+    private function handleIfscVerification($data)
+    {
+        $ifscCode = strtoupper(trim($data['ifsc'] ?? ''));
+        if (empty($ifscCode)) {
+            return response()->json(['error' => 'IFSC code is required'], 400);
+        }
+
+        $payload = [
+            'ifsc' => $ifscCode,
+            'verification_id' => 'IFSC_' . uniqid() . '_' . time(),
+        ];
+
+        try {
+            $response = Http::withHeaders($this->getHeaders())
+                ->timeout(30)
+                ->post(env('IFSC_VERIFICATION_URL'), $payload);
+
+            return $this->handleResponse($response);
+        } catch (Exception $e) {
+            return $this->handleVerificationException($e);
+        }
+    }
+
+    private function handleDrivingLicenseVerification($data)
+    {
+        $licenseNumber = strtoupper(trim($data['dl_number'] ?? ''));
+        $dob = $data['dob'];
+        if (empty($licenseNumber) || empty($dob)) {
+            return response()->json(['error' => 'Driving license number and date of birth both are required'], 400);
+        }
+        try {
+            $dobFormatted = (new \DateTime($dob))->format('Y-m-d');
+        } catch (Exception $e) {
+            return response()->json(['error' => 'Invalid date of birth format. Use YYYY-MM-DD.'], 400);
+        }
+
+        $payload = [
+            'dl_number' => $licenseNumber,
+            'verification_id' => 'DL_' . uniqid() . '_' . time(),
+            'dob' => $dobFormatted,
+        ];
+
+        try {
+            $response = Http::withHeaders($this->getHeaders())
+                ->timeout(30)
+                ->post(env('DRIVING_LICENSE_VERIFICATION_URL'), $payload);
+
+            return $this->handleResponse($response);
+        } catch (Exception $e) {
+            return $this->handleVerificationException($e);
+        }
+    }
+
+    private function handleResponse($response)
+    {
+        if ($response->successful()) {
+            return response()->json([
+                'success' => true,
+                'data' => $response->json()
+            ]);
+        }
+
+        return response()->json([
+            'success' => false,
+            'message' => 'Verification failed',
+            'error' => $response->json(),
+            'status' => $response->status()
+        ], $response->status());
+    }
+
+    private function handleVerificationException(Exception $e)
+    {
+        Log::error('Verification error: ' . $e->getMessage());
+        return response()->json([
+            'success' => false,
+            'message' => 'Server error occurred',
+            'error' => $e->getMessage()
+        ], 500);
+    }
 
 }
