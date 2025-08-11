@@ -113,7 +113,7 @@ return [
     'password_timeout' => env('AUTH_PASSWORD_TIMEOUT', 10800),
 
     /*for Registeration status is enabled or not*/
-    'registration_enabled' => env('REGISTRATION_ENABLED', true),
+    'registration_enabled' => env('REGISTRATION_ENABLED', false),
 
 
 ];

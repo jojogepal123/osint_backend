@@ -2,11 +2,15 @@
 
 namespace App\Http\Controllers;
 
+use Exception;
 use Illuminate\Http\Request;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Facades\Mail;
+use App\Mail\SendOtpMail;
+use Illuminate\Support\Facades\Log;
 
 class AuthController extends Controller
 {
@@ -36,26 +40,14 @@ class AuthController extends Controller
             'email_verified_at' => now(),
         ]);
 
-        // Delete old tokens (optional)
-        $user->tokens()->delete();
 
-        // Create token
-        $tokenResult = $user->createToken('auth_token');
-        $token = $tokenResult->plainTextToken;
-
-        // Calculate expiration (e.g., 60 mins from now)
-        $expiresAt = now()->addMinutes(60);
-
-        // Update token's created_at manually if needed
-        $tokenResult->accessToken->created_at = now();
-        $tokenResult->accessToken->save();
 
         return response()->json([
-            'token' => $token,
             'user' => $user,
-            'expires_at' => $expiresAt->toDateTimeString(),
+            'message' => 'Registration successful. Please Login to continue.'
         ], 201);
     }
+
 
 
     public function login(Request $request)
@@ -71,6 +63,30 @@ class AuthController extends Controller
             throw ValidationException::withMessages([
                 'email' => ['Invalid credentials.'],
             ]);
+        }
+
+
+        if (!$user->email_verified_at || ($user->last_otp_verified_at?->diffInHours(now()) ?? 13) >= 12) {
+
+            if (!$user->otp || now()->gt($user->otp_expires_at)) {
+                try {
+                    $otp = rand(100000, 999999);
+                    $user->otp = $otp;
+                    $user->otp_expires_at = now()->addMinutes(5);
+                    $user->save();
+
+                    Mail::to($user->email)->send(new SendOtpMail($otp));
+                    Log::info("OTP sent to " . $user->email);
+                } catch (Exception $e) {
+                    Log::error("Error in sending email to " . $user->email . $e);
+                }
+            }
+            return response()->json([
+                'message' => 'You need to verify your email before logging in.',
+                'otp_required' => true,
+                'email' => $user->email,
+                'otp_expires_at' => $user->otp_expires_at,
+            ], 403);
         }
 
         // Optional: Revoke old tokens
@@ -99,4 +115,68 @@ class AuthController extends Controller
 
         return response()->json(['message' => 'Logged out']);
     }
+
+    public function resendOtp(Request $request)
+    {
+        $request->validate([
+            'email' => 'required|email|exists:users,email',
+        ]);
+
+        $user = User::where('email', $request->email)->firstOrFail();
+
+        $otp = rand(100000, 999999);
+        $user->otp = $otp;
+        $user->otp_expires_at = now()->addMinutes(5);
+        $user->save();
+
+        Mail::to($user->email)->send(new SendOtpMail($otp));
+
+        return response()->json([
+            'message' => 'OTP resent sent to ' . $request->email,
+            'otp_expires_at' => $user->otp_expires_at,
+        ]);
+    }
+
+
+    public function verifyOtp(Request $request)
+    {
+        $request->validate([
+            'email' => 'required|email',
+            'otp' => 'required|digits:6',
+        ]);
+
+        $user = User::where('email', $request->email)->first();
+
+        if (!$user) {
+            return response()->json(['message' => 'User not found'], 404);
+        }
+
+        if (!$user->otp || $user->otp !== $request->otp) {
+            return response()->json(['message' => 'Invalid OTP'], 422); // important
+        }
+
+        if (now()->gt($user->otp_expires_at)) {
+            return response()->json(['message' => 'OTP has expired.'], 403);
+        }
+
+        $user->email_verified_at = now();
+        $user->last_otp_verified_at = now();
+        $user->save();
+
+        // Optional: Revoke old tokens
+        $user->tokens()->delete();
+        $tokenResult = $user->createToken('auth_token');
+        $token = $tokenResult->plainTextToken;
+        $expiresAt = now()->addMinutes(60);
+        // Save updated creation time
+        $tokenResult->accessToken->created_at = now();
+        $tokenResult->accessToken->save();
+
+        return response()->json([
+            'token' => $token,
+            'expires_at' => $expiresAt->toDateTimeString(),
+        ]);
+    }
+
+
 }

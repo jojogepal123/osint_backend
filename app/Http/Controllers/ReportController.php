@@ -9,7 +9,8 @@ use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Http;
-
+use Exception;
+use Illuminate\Support\Facades\Validator;
 class ReportController extends Controller
 {
     private function getImageBase64($url)
@@ -18,7 +19,7 @@ class ReportController extends Controller
             $imgData = file_get_contents($url);
             $type = pathinfo($url, PATHINFO_EXTENSION);
             return 'data:image/' . $type . ';base64,' . base64_encode($imgData);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return null;
         }
     }
@@ -41,6 +42,8 @@ class ReportController extends Controller
         Storage::makeDirectory('/reports');
         // log::info($data);
 
+        // Log::info($data);
+
         // Render view based on type
         if ($type === 'tel') {
             $html = View::make('report.tel_template', compact('data'))->render();
@@ -62,12 +65,11 @@ class ReportController extends Controller
             $pdf = Pdf::loadHTML($html);
             $pdf->save($filePath);
             return response()->download($filePath, $filename);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error("PDF generation failed: " . $e->getMessage());
             return response()->json(['error' => 'PDF generation failed'], 500);
         }
     }
-
 
     public function generateAiReport(Request $request)
     {
@@ -213,7 +215,7 @@ class ReportController extends Controller
             $html = View::make('report.upi_template', compact('data'))->render();
             Pdf::loadHTML($html)->save($filePath);
             return response()->download($filePath, $filename);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             \Log::error("UPI PDF generation error: " . $e->getMessage());
             return response()->json(['error' => 'PDF generation failed'], 500);
         }
@@ -242,8 +244,73 @@ class ReportController extends Controller
             $html = View::make('report.rc_template', compact('data'))->render();
             Pdf::loadHTML($html)->save($filePath);
             return response()->download($filePath, $filename);
-        } catch (\Exception $e) {
-            Log::error("RC PDF generation error: " . $e->getMessage());
+        } catch (Exception $e) {
+            \Log::error("RC PDF generation error: " . $e->getMessage());
+            return response()->json(['error' => 'PDF generation failed'], 500);
+        }
+    }
+    // public function generateChallanReport(Request $request)
+    // {
+    //     \Log::info('Raw request data:', $request->all());
+    //     $validated = $request->validate([
+    //         'data' => ['required', 'array'],
+    //     ]);
+
+    //     $data = array_filter($validated['data'], function ($value, $key) {
+    //         $key = strtolower($key);
+    //         if (in_array($key, ['client_id', 'clientid']))
+    //             return false;
+    //         if (is_null($value) || $value === '')
+    //             return false;
+    //         $v = strtolower(trim((string) $value));
+    //         return !in_array($v, ['n/a', 'na', 'n.a']);
+    //     }, ARRAY_FILTER_USE_BOTH);
+
+    //     $filename = 'challan_details_' . now()->format('Ymd_His') . '_' . Str::uuid() . '.pdf';
+    //     $filePath = storage_path("app/private/reports/{$filename}");
+    //     \Storage::makeDirectory('private/reports');
+
+    //     try {
+    //         $html = View::make('report.challan_template', compact('data'))->render();
+    //         Pdf::loadHTML($html)->save($filePath);
+    //         return response()->download($filePath, $filename);
+    //     } catch (Exception $e) {
+    //         \Log::error("Challan PDF generation error: " . $e->getMessage());
+    //         return response()->json(['error' => 'PDF generation failed'], 500);
+    //     }
+    // }
+    public function generateChallanReport(Request $request)
+    {
+        // \Log::info("Raw request data: ", $request->all());
+
+        $validated = $request->validate([
+            'data' => ['required', 'array'],
+        ]);
+
+        // Fix: Properly handle nested arrays like challan_details
+        $data = array_filter($validated['data'], function ($value, $key) {
+            $key = strtolower($key);
+            if (in_array($key, ['client_id', 'clientid']))
+                return false;
+            if (is_null($value) || $value === '')
+                return false;
+            if (is_scalar($value)) {
+                $v = strtolower(trim((string) $value));
+                return !in_array($v, ['n/a', 'na', 'n.a']);
+            }
+            return true; // Keep arrays like challan_details
+        }, ARRAY_FILTER_USE_BOTH);
+
+        $filename = 'challan_details_' . now()->format('Ymd_His') . '_' . Str::uuid() . '.pdf';
+        $filePath = storage_path("app/private/reports/{$filename}");
+        \Storage::makeDirectory('private/reports');
+
+        try {
+            $html = View::make('report.challan_template', compact('data'))->render();
+            Pdf::loadHTML($html)->save($filePath);
+            return response()->download($filePath, $filename);
+        } catch (Exception $e) {
+            \Log::error("Challan PDF generation error: " . $e->getMessage());
             return response()->json(['error' => 'PDF generation failed'], 500);
         }
     }
