@@ -509,6 +509,8 @@ class ApiServiceController extends Controller
                         ], 402);
                     }
                 }
+
+                Log::info($data);
                 return response()->json([
                     ...$data,
                     'credits' => $user->credits,
