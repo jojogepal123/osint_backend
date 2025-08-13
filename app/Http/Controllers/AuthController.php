@@ -79,9 +79,7 @@ class AuthController extends Controller
             }
 
             return response()->json([
-                'message' => $isNewDevice
-                    ? 'New device detected. Please verify your email before logging in.'
-                    : 'You need to verify your email before logging in.',
+                'message' => 'You need to verify your email before logging in.',
                 'otp_required' => true,
                 'email' => $user->email,
                 'otp_expires_at' => $user->otp_expires_at,
