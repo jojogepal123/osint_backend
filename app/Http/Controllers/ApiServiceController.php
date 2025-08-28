@@ -58,12 +58,12 @@ class ApiServiceController extends Controller
                     'tcData' => fn($pool) => $pool->withHeaders([
                         'x-rapidapi-key' => env('TRUECALLER_API_KEY'),
                         'x-rapidapi-host' => env('TRUECALLER_API_HOST'),
-                    ])->timeout(30)->get($urls['truecaller'] . "/{$number}"),
+                    ])->timeout(40)->get($urls['truecaller'] . "/{$number}"),
 
                     'wpData' => fn($pool) => $pool->withHeaders([
                         'x-rapidapi-key' => env('TEL_API_KEY'),
                         'x-rapidapi-host' => env('TEL_API_HOST'),
-                    ])->timeout(30)->get($urls['whatsapp'] . "/{$number}"),
+                    ])->timeout(40)->get($urls['whatsapp'] . "/{$number}"),
 
 
                     'telData' => fn($pool) => $pool->withHeaders([
@@ -86,13 +86,13 @@ class ApiServiceController extends Controller
                     'sKData' => fn($pool) => $pool->withHeaders([
                         'Content-Type' => 'application/json',
                         'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
-                    ])->timeout(30)->post($urls['spkyc'], [
+                    ])->timeout(40)->post($urls['spkyc'], [
                                 'mobile' => $localNumber,
                             ]),
                     'suData' => fn($pool) => $pool->withHeaders([
                         'Content-Type' => 'application/json',
                         'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
-                    ])->timeout(30)->post($urls['spupi'], [
+                    ])->timeout(40)->post($urls['spupi'], [
                                 'mobile_number' => $localNumber,
                             ]),
 
@@ -105,7 +105,7 @@ class ApiServiceController extends Controller
                     'srData' => fn($pool) => $pool->withHeaders([
                         'Content-Type' => 'application/json',
                         'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
-                    ])->timeout(30)->post($urls['sprc'], [
+                    ])->timeout(40)->post($urls['sprc'], [
                                 'mobile_number' => $localNumber,
                             ]),
 

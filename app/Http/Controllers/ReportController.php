@@ -232,7 +232,7 @@ class ReportController extends Controller
 
         $filename = 'rc_details_' . now()->format('Ymd_His') . '_' . Str::uuid() . '.pdf';
         $filePath = storage_path("app/private/reports/{$filename}");
-        \Storage::makeDirectory('private/reports');
+        Storage::makeDirectory('private/reports');
 
         try {
             $html = View::make('report.rc_template', compact('data'))->render();
