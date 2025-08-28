@@ -40,9 +40,7 @@ class ReportController extends Controller
 
         // Ensure directory exists
         Storage::makeDirectory('/reports');
-        // log::info($data);
 
-        // Log::info($data);
 
         // Render view based on type
         if ($type === 'tel') {
@@ -88,13 +86,13 @@ class ReportController extends Controller
         $prompt = <<<EOT
         You are a senior OSINT (Open Source Intelligence) analyst.
 
-        the following JSON contains structured profile data collected through various public sources, including phones, emails, usernames, social media presence, locations, carriers, upi deatails,bank details, rc number, data breaches, online presence, imsi number, phone status, leaked databases and other identifiers. also use sources which are mentioned in json data.
+        the following JSON contains structured profile data collected through various public sources, including phones, emails, usernames, social media presence, locations, carriers, upi deatails,bank details, rc number, data breaches, online presence, imsi number, phone status, leaked databases, public locations and reviews and other identifiers. also use sources which are mentioned in json data.
 
         Include:
         - "intelligenceSummary": A full natural language summary of who this person is.
         - "riskLevel": Low | Medium | High, with a full explaination and justification.
         - "nextSteps": List of things an analyst should do next.
-        - "profileHighlights": Bullet points with full name, emails, phones, location, etc.
+        - "profileHighlights": Bullet points with full name, emails, phones, location, public locations and reviews etc.
         - "confidenceScore": Score from 0 to 100 showing how reliable this data looks.
         - "anomalies": Any suspicious things (e.g. duplicate emails, mismatched names, missing fields).
         - "socialPresenceSummary": Summary of detected presence on WhatsApp, Facebook, etc.
@@ -110,7 +108,7 @@ class ReportController extends Controller
         "confidenceScore": 0–100,
         "anomalies": [...],
         "socialPresenceSummary": "...",
-        "dataFreshness": "..."
+        "dataFreshness": "...",
         }
 
         --- Begin Data ---
@@ -179,11 +177,7 @@ class ReportController extends Controller
             'results' => $results, // full original results
         ]);
 
-        // Log::info('Gemini cleaned JSON', [
-        //     'summary' => $summary,
-        //     'riskLevel' => $riskLevel,
-        //     'nextSteps' => $nextSteps,
-        // ]);
+
 
         $filename = 'ai-report-' . Str::slug($userInput) . '.pdf';
 
@@ -216,7 +210,7 @@ class ReportController extends Controller
             Pdf::loadHTML($html)->save($filePath);
             return response()->download($filePath, $filename);
         } catch (Exception $e) {
-            \Log::error("UPI PDF generation error: " . $e->getMessage());
+            Log::error("UPI PDF generation error: " . $e->getMessage());
             return response()->json(['error' => 'PDF generation failed'], 500);
         }
     }
@@ -245,43 +239,13 @@ class ReportController extends Controller
             Pdf::loadHTML($html)->save($filePath);
             return response()->download($filePath, $filename);
         } catch (Exception $e) {
-            \Log::error("RC PDF generation error: " . $e->getMessage());
+            Log::error("RC PDF generation error: " . $e->getMessage());
             return response()->json(['error' => 'PDF generation failed'], 500);
         }
     }
-    // public function generateChallanReport(Request $request)
-    // {
-    //     \Log::info('Raw request data:', $request->all());
-    //     $validated = $request->validate([
-    //         'data' => ['required', 'array'],
-    //     ]);
-
-    //     $data = array_filter($validated['data'], function ($value, $key) {
-    //         $key = strtolower($key);
-    //         if (in_array($key, ['client_id', 'clientid']))
-    //             return false;
-    //         if (is_null($value) || $value === '')
-    //             return false;
-    //         $v = strtolower(trim((string) $value));
-    //         return !in_array($v, ['n/a', 'na', 'n.a']);
-    //     }, ARRAY_FILTER_USE_BOTH);
-
-    //     $filename = 'challan_details_' . now()->format('Ymd_His') . '_' . Str::uuid() . '.pdf';
-    //     $filePath = storage_path("app/private/reports/{$filename}");
-    //     \Storage::makeDirectory('private/reports');
-
-    //     try {
-    //         $html = View::make('report.challan_template', compact('data'))->render();
-    //         Pdf::loadHTML($html)->save($filePath);
-    //         return response()->download($filePath, $filename);
-    //     } catch (Exception $e) {
-    //         \Log::error("Challan PDF generation error: " . $e->getMessage());
-    //         return response()->json(['error' => 'PDF generation failed'], 500);
-    //     }
-    // }
     public function generateChallanReport(Request $request)
     {
-        // \Log::info("Raw request data: ", $request->all());
+
 
         $validated = $request->validate([
             'data' => ['required', 'array'],
@@ -310,7 +274,7 @@ class ReportController extends Controller
             Pdf::loadHTML($html)->save($filePath);
             return response()->download($filePath, $filename);
         } catch (Exception $e) {
-            \Log::error("Challan PDF generation error: " . $e->getMessage());
+            Log::error("Challan PDF generation error: " . $e->getMessage());
             return response()->json(['error' => 'PDF generation failed'], 500);
         }
     }

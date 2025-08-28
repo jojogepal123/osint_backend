@@ -213,6 +213,13 @@
             color: #6b7280;
             margin-left: 4px;
         }
+        .map-key{
+            color: #1e40af;
+            font-weight: 600;
+            text-align: left;
+            width: 200px;
+            white-space: nowrap;
+        }
     </style>
 </head>
 
@@ -274,14 +281,14 @@
 
     {{-- Basic Fields --}}
     @foreach([
-            'fullNames' => 'Full Names',
-            'userNames' => 'Usernames',
-            'emails' => 'Emails',
-            'phones' => 'Phone Numbers',
-            'locations' => 'Locations',
-            'lastUpdated' => 'Last Updated',
-            'basicInfo' => 'Basic Info'
-        ] as $field => $label)
+    'fullNames' => 'Full Names',
+    'userNames' => 'Usernames',
+    'emails' => 'Emails',
+    'phones' => 'Phone Numbers',
+    'locations' => 'Locations',
+    'lastUpdated' => 'Last Updated',
+    'basicInfo' => 'Basic Info'
+] as $field => $label)
         @if(!empty($profile[$field]))
             <div class="section">
                 <h2>{{ $label }}</h2>
@@ -467,20 +474,46 @@
                     </div>
                 </div>
             @endif
-
-
-
-
            @endforeach
     @endif
 
-               
+     
+
+    @if(!empty($data['mapData']))
+        <h2> Public Location Data</h2>
+        @foreach($data['mapData'] as $index => $place)
+            <div class="section">
+                <h3 style="font-size:16px; font-weight:bold; color:#1f2937; margin-bottom:8px;">
+                    {{ $place['name'] ?? 'Unknown Place' }}
+                </h3>
+
+                <p style="margin:4px 0;">
+                    <strong class="map-key">Address:</strong> {{ $place['address'] ?? 'N/A' }}
+                </p>
+
+                <p style="margin:4px 0;">
+                    <strong class="map-key">Date:</strong> {{ $place['date'] ?? '' }}
+                </p>
+
+                {{-- Map Image if available --}}
+                @if(!empty($place['mapImage']))
+                    <div style="margin-top:10px;">
+                        <img src="data:image/png;base64,{{ $place['mapImage'] }}" 
+                            alt="Map of {{ $place['name'] ?? 'Location' }}" 
+                            style="width:100%; max-width:500px; border-radius:8px; border:1px solid #ddd;">
+                    </div>
+                @endif
+            </div>
+        @endforeach
+    @endif
+
+         
                
      
               {{-- Legal Disclaimer --}}
     <div id="legal-disclaimer" class="section">
 
-                       <h2>LEGAL DISCLAIMER FOR OSINT REPORT</h2>
+        <h2>LEGAL DISCLAIMER FOR OSINT REPORT</h2>
         <p>
             This Open Source Intelligence (OSINT) report has been prepared by <strong>OSINTWORK</strong>, a private entity acting solely as a technical intermediary, at the request of, and for the exclusive use of, authorized law enforcement agencies. The information contained in this report has been gathered strictly from publicly accessible sources and legally verified digital tools as of the date of its generation. No leaked, unauthorized, or unlawfully obtained data has been used in its preparation.
         </p>
@@ -511,14 +544,10 @@
                
                
                
-            <li><strong>Data Protection and Retention:</strong> OSINTWORK compiles this report using ethical and leg
-         a      lly compliant OSINT methodologies. No personal data is stored post-transmission. The requesting law 
-           e    nforcement agency bears sole responsibility for ensuring compliance with relevant data protection regulations and internal data handling policies.</li>
+            <li><strong>Data Protection and Retention:</strong> OSINTWORK compiles this report using ethical and legally compliant OSINT methodologies. No personal data is stored post-transmission. The requesting lawenforcement agency bears sole responsibility for ensuring compliance with relevant data protection regulations and internal data handling policies.</li>
 
-            <li><strong>Verification Requirement:</strong> The information in this report is derived from OSINT t
-            e   chniques and should be treated as preliminary intelligence. It must be independently verified 
-             b  y the requesting agency through official and legally admissible channels prior to being used in legal p
-              r oceedings or enforcement actions.</li>
+            <li><strong>Verification Requirement:</strong> The information in this report is derived from OSINT       techniques and should be treated as preliminary intelligence. It must be independently verified 
+             by the requesting agency through official and legally admissible channels prior to being used in legal proceedings or enforcement actions.</li>
 
             <li><strong>Confidentiality:</strong> This report is strictly confidential and may not be disclosed,
                 shared, or disseminated beyond the scope of the official investigation for which it was requested. The
