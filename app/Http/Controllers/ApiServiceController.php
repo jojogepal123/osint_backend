@@ -85,7 +85,6 @@ class ApiServiceController extends Controller
 
                     'sKData' => fn($pool) => $pool->withHeaders([
                         'Content-Type' => 'application/json',
-                        'Content-Type' => 'application/json',
                         'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
                     ])->timeout(40)->post($urls['spkyc'], [
                                 'mobile' => $localNumber,
