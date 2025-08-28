@@ -304,9 +304,7 @@ class ApiServiceController extends Controller
         ]);
 
         $upiId = $request->input('upi_id');
-        // Log::debug('Surepass UPI Full Lookup Request', [
-        //     'upi_id' => $upiId,
-        // ]);
+
 
         try {
             $response = Http::withHeaders([
@@ -344,7 +342,7 @@ class ApiServiceController extends Controller
                 ], $response->status());
             }
         } catch (Throwable $e) {
-            \Log::error('Surepass UPI Full Lookup Error', [
+            Log::error('Surepass UPI Full Lookup Error', [
                 'error' => $e->getMessage(),
                 'upi_id' => $upiId,
             ]);
@@ -359,9 +357,7 @@ class ApiServiceController extends Controller
         ]);
 
         $idNumber = $request->input('id_number');
-        // Log::debug('Surepass RC Full Lookup Request', [
-        //     'id_number' => $idNumber,
-        // ]);
+
 
         try {
             $response = Http::withHeaders([
@@ -399,7 +395,7 @@ class ApiServiceController extends Controller
                 ], $response->status());
             }
         } catch (Throwable $e) {
-            \Log::error('Surepass RC Full Lookup Error', [
+            Log::error('Surepass RC Full Lookup Error', [
                 'error' => $e->getMessage(),
                 'id_number' => $idNumber,
             ]);
@@ -414,7 +410,7 @@ class ApiServiceController extends Controller
         ]);
 
         $rcNumber = $request->input('rc_number');
-        Log::debug('Surepass RC Challan Lookup Request', ['rc_number' => $rcNumber]);
+
 
         try {
             $response = Http::withHeaders([
@@ -449,7 +445,7 @@ class ApiServiceController extends Controller
                 ], $response->status());
             }
         } catch (Throwable $e) {
-            \Log::error('Surepass RC Challan Lookup Error', [
+            Log::error('Surepass RC Challan Lookup Error', [
                 'error' => $e->getMessage(),
                 'rc_number' => $rcNumber,
             ]);
@@ -510,7 +506,7 @@ class ApiServiceController extends Controller
                     }
                 }
 
-                Log::info($data);
+
                 return response()->json([
                     ...$data,
                     'credits' => $user->credits,
@@ -619,10 +615,7 @@ class ApiServiceController extends Controller
                 $filename = 'cibil_report_' . $mobile . '_' . now()->format('Ymd_His') . '.pdf';
                 $filePath = "cibil_reports/{$filename}";
                 Storage::put($filePath, $pdfResponse->body());
-                // Log::info('CIBIL Report Generated', [
-                //     'filename' => $filename,
-                //     'size' => strlen($pdfResponse->body()),
-                // ]);
+
                 // return response($pdfResponse->body(), 200, [
                 //     'Content-Type' => 'application/pdf',
                 //     'Content-Disposition' => 'attachment; filename="' . $filename . '"'
@@ -831,10 +824,7 @@ class ApiServiceController extends Controller
 
     public function verificationIdData(Request $request)
     {
-        // Log::info('Verification request received', [
-        //     'type' => $request->input('type'),
-        //     'data' => $request->input('data')
-        // ]);
+
         $request->validate([
             'type' => 'required|string',
             'data' => 'required|array',
@@ -948,10 +938,7 @@ class ApiServiceController extends Controller
                 ->timeout(30)
                 ->post(env('BANK_VERIFICATION_URL'), $payload);
 
-            // Log::info('Bank Account API Response', [
-            //     'status' => $response->status(),
-            //     'body' => $response->body()
-            // ]);
+
             return $this->deductUserBankCredits($response, 7.50);
             // if ($response->successful()) {
             //     return response()->json([
@@ -1020,20 +1007,14 @@ class ApiServiceController extends Controller
             $payload['name'] = $data['name'];
         }
 
-        // Log::info('Making PAN360 verification API call', [
-        //     'url' => env('CASHFREE_BASE_URL') . '/verification/pan/advance',
-        //     'payload' => $payload
-        // ]);
+
 
         try {
             $response = Http::withHeaders($this->getHeaders())
                 ->timeout(30)
                 ->post(env('PAN_VERIFICATION_URL'), $payload);
 
-            // Log::info('PAN360 API Response', [
-            //     'status' => $response->status(),
-            //     'body' => $response->body()
-            // ]);
+
             return $this->deductUserVerifyCredits($response, 10.50);
             // return $this->handleResponse($response);
         } catch (Exception $e) {

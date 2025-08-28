@@ -224,6 +224,7 @@
             <p>{{ $dataFreshness }}</p>
         </div>
     @endif
+
     <div class="legal-disclaimer">
         <h2>LEGAL DISCLAIMER FOR OSINT REPORT</h2>
         <p>This Open Source Intelligence (OSINT) report has been prepared by <strong>OSINTWORK</strong>, a private
