@@ -291,6 +291,9 @@
         This report was automatically generated via {{ config('app.name') }} on
         {{ now()->format('Y-m-d') }}.
     </div>
+    <div>
+        <p><strong>Downloaded by:</strong> {{ $userEmail }}</p>
+    </div>
 
 </body>
 

@@ -377,6 +377,8 @@
             By accepting and utilizing this report, the law enforcement agency affirms its agreement with the above terms and acknowledges that OSINTWORK acts strictly as an intermediary, without control over source data or its subsequent application. The agency is responsible for ensuring that all personnel handling this report are aware of and fully comply with these terms.
         </p>
     </div>
-
+        <div>
+        <p><strong>Downloaded by:</strong> {{ $userEmail }}</p>
+    </div>
 </body>
 </html>

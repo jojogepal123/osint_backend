@@ -52,4 +52,10 @@ class User extends Authenticatable
             'last_otp_verified_at' => 'datetime'
         ];
     }
+
+    public function ips()
+    {
+        return $this->hasMany(UserIp::class);
+    }
+
 }

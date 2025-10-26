@@ -11,6 +11,7 @@ use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\Mail;
 use App\Mail\SendOtpMail;
 use Illuminate\Support\Facades\Log;
+use App\Models\UserIp;
 
 class AuthController extends Controller
 {
@@ -85,6 +86,14 @@ class AuthController extends Controller
                 'otp_expires_at' => $user->otp_expires_at,
             ], 403);
         }
+
+        $ip = $request->ip();
+
+        // Store IP on login
+        UserIp::create([
+            'user_id' => $user->id,
+            'ip' => $ip,
+        ]);
 
         $user->tokens()->delete();
         $token = $user->createToken('auth_token')->plainTextToken;

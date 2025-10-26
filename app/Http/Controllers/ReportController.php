@@ -10,9 +10,11 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Http;
 use Exception;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
 class ReportController extends Controller
 {
+
     private function getImageBase64($url)
     {
         try {
@@ -23,6 +25,8 @@ class ReportController extends Controller
             return null;
         }
     }
+
+
     public function generateReport(Request $request)
     {
         $validated = $request->validate([
@@ -35,6 +39,8 @@ class ReportController extends Controller
         $type = $validated['type'];
         $userInput = $validated['userInput'];
 
+        $userEmail = Auth::check() ? Auth::user()->email : 'N/A';
+
         $filename = 'report_' . now()->format('Ymd_His') . '_' . Str::uuid() . '.pdf';
         $filePath = storage_path("app/private/reports/{$filename}");
 
@@ -42,9 +48,10 @@ class ReportController extends Controller
         Storage::makeDirectory('/reports');
 
 
+
         // Render view based on type
         if ($type === 'tel') {
-            $html = View::make('report.tel_template', compact('data'))->render();
+            $html = View::make('report.tel_template', compact('data', 'userEmail'))->render();
         } else if ($type === 'email') {
             if (!empty($data['breachData'])) {
                 foreach ($data['breachData'] as $key => $value) {
@@ -53,7 +60,7 @@ class ReportController extends Controller
                     }
                 }
             }
-            $html = View::make('report.email_template', compact('data'))->render();
+            $html = View::make('report.email_template', compact('data', 'userEmail'))->render();
         } else {
             Log::error("Invalid report type: $type");
             return response()->json(['error' => 'Invalid type'], 422);
@@ -80,6 +87,9 @@ class ReportController extends Controller
         $userInput = $validated['userInput'];
         $type = $validated['type'];
         $results = $validated['results'];
+
+        $userEmail = Auth::check() ? Auth::user()->email : 'N/A';
+
 
         $prettyResults = json_encode($results, JSON_PRETTY_PRINT);
 
@@ -174,7 +184,8 @@ class ReportController extends Controller
             'userInput' => $userInput,
             'generation_time' => now()->format('Y-m-d H:i:s'),
             'type' => $type,
-            'results' => $results, // full original results
+            'results' => $results,
+            'userEmail' => $userEmail, // full original results
         ]);
 
 
@@ -191,6 +202,8 @@ class ReportController extends Controller
             'data' => ['required', 'array'],
         ]);
 
+        $userEmail = Auth::check() ? Auth::user()->email : 'N/A';
+
         $data = array_filter($validated['data'], function ($value, $key) {
             $key = strtolower($key);
             if (in_array($key, ['client_id', 'clientid']))
@@ -206,7 +219,10 @@ class ReportController extends Controller
         \Storage::makeDirectory('private/reports');
 
         try {
-            $html = View::make('report.upi_template', compact('data'))->render();
+            $html = View::make('report.upi_template', [
+                'data' => $data,
+                'userEmail' => $userEmail,
+            ])->render();
             Pdf::loadHTML($html)->save($filePath);
             return response()->download($filePath, $filename);
         } catch (Exception $e) {
@@ -219,6 +235,7 @@ class ReportController extends Controller
         $validated = $request->validate([
             'data' => ['required', 'array'],
         ]);
+        $userEmail = Auth::check() ? Auth::user()->email : 'N/A';
 
         $data = array_filter($validated['data'], function ($value, $key) {
             $key = strtolower($key);
@@ -235,7 +252,10 @@ class ReportController extends Controller
         Storage::makeDirectory('private/reports');
 
         try {
-            $html = View::make('report.rc_template', compact('data'))->render();
+            $html = View::make('report.rc_template', [
+                'data' => $data,
+                'userEmail' => $userEmail,
+            ])->render();
             Pdf::loadHTML($html)->save($filePath);
             return response()->download($filePath, $filename);
         } catch (Exception $e) {
@@ -250,6 +270,8 @@ class ReportController extends Controller
         $validated = $request->validate([
             'data' => ['required', 'array'],
         ]);
+
+        $userEmail = Auth::check() ? Auth::user()->email : 'N/A';
 
         // Fix: Properly handle nested arrays like challan_details
         $data = array_filter($validated['data'], function ($value, $key) {
@@ -270,7 +292,10 @@ class ReportController extends Controller
         \Storage::makeDirectory('private/reports');
 
         try {
-            $html = View::make('report.challan_template', compact('data'))->render();
+            $html = View::make('report.challan_template', [
+                'data' => $data,
+                'userEmail' => $userEmail,
+            ])->render();
             Pdf::loadHTML($html)->save($filePath);
             return response()->download($filePath, $filename);
         } catch (Exception $e) {

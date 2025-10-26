@@ -173,7 +173,7 @@ class ApiServiceController extends Controller
                 }
             }
             if ($anySuccessful) {
-                $deduction = 25.34;
+                $deduction = env('TEL_COST');
 
                 if ($user->credits >= $deduction) {
                     $user->credits -= $deduction;
@@ -272,7 +272,7 @@ class ApiServiceController extends Controller
 
             // Deduct credits only if any response was successful
             if ($anySuccessful) {
-                $deduction = 5;
+                $deduction = env('EMAIL_COST');
 
                 if ($user->credits >= $deduction) {
                     $user->credits -= $deduction;
@@ -316,7 +316,7 @@ class ApiServiceController extends Controller
 
             if ($response->successful()) {
                 $data = $response->json();
-                $deduction = 6.50;
+                $deduction = env('UPI_COST');
                 $user = auth()->user();
 
                 // Check if user has sufficient credits
@@ -369,7 +369,7 @@ class ApiServiceController extends Controller
 
             if ($response->successful()) {
                 $data = $response->json();
-                $deduction = 4.00;
+                $deduction = env('RC_COST');
                 $user = auth()->user();
 
                 // Check if user has sufficient credits
@@ -424,7 +424,7 @@ class ApiServiceController extends Controller
                 // Deduct 7.00 credits from authenticated user
                 $user = auth()->user();
                 if ($user->credits >= 7) {
-                    $user->credits -= 7;
+                    $user->credits -= env('RC_CHALLAN_COST');
                     $user->save();
                 } else {
                     return response()->json([
@@ -493,7 +493,7 @@ class ApiServiceController extends Controller
                 $data = $response->json();
                 $anySuccessful = true;
                 if ($anySuccessful) {
-                    $deduction = 5;
+                    $deduction = env('LEAKDATA_COST');
                     $user = auth()->user();
                     if ($user->credits >= $deduction) {
                         $user->credits -= $deduction;
@@ -570,7 +570,7 @@ class ApiServiceController extends Controller
             ])->timeout(30)->post(env('CORPORATE_GSTIN_URL'), [
                         'id_number' => $idNumber,
                     ]);
-            return $this->deductUserCredits($response, 9.00);
+            return $this->deductUserCredits($response, env('CORPORATE_GSTIN_COST'));
 
             // return $this->handleSurepassResponse($response);
         } catch (Exception $e) {
@@ -621,7 +621,7 @@ class ApiServiceController extends Controller
                 //     'Content-Disposition' => 'attachment; filename="' . $filename . '"'
                 // ]);
                 // Deduct ₹150.00 and return PDF if credits are sufficient
-                return $this->deductUserCreditsForPdf($pdfResponse->body(), 150.00, $filename);
+                return $this->deductUserCreditsForPdf($pdfResponse->body(), env('CREDIT_REPORT_COST'), $filename);
             }
 
             return $this->handleSurepassResponse($response);
@@ -665,7 +665,7 @@ class ApiServiceController extends Controller
             ])->timeout(30)->post(env('CORPORATE_CIN_URL'), [
                         'id_number' => $cin,
                     ]);
-            return $this->deductUserCredits($response, 9.00);
+            return $this->deductUserCredits($response, env('CORPORATE_CIN_COST'));
 
             // return $this->handleSurepassResponse($response);
         } catch (Exception $e) {
@@ -691,7 +691,7 @@ class ApiServiceController extends Controller
             ])->timeout(30)->post(env('GST_INTEL_URL'), [
                         'id_number' => $gst,
                     ]);
-            return $this->deductUserCredits($response, 9.00);
+            return $this->deductUserCredits($response, env('GST_INTEL_COST'));
 
             // return $this->handleSurepassResponse($response);
         } catch (Exception $e) {
@@ -714,7 +714,7 @@ class ApiServiceController extends Controller
             ])->timeout(30)->post(env('EMPLOYMENT_HISTORY_URL'), [
                         'id_number' => $idNumber,
                     ]);
-            return $this->deductUserCredits($response, 36.00);
+            return $this->deductUserCredits($response, env('EMPLOYEMENT_HISTORY'));
 
             // return $this->handleSurepassResponse($response);
         } catch (Exception $e) {
@@ -736,7 +736,7 @@ class ApiServiceController extends Controller
             ])->timeout(30)->post(env('FIND_UAN_URL'), [
                         'mobile_number' => $mobile,
                     ]);
-            return $this->deductUserCredits($response, 6.00);
+            return $this->deductUserCredits($response, env('FINDUAN_COST'));
 
             // return $this->handleSurepassResponse($response);
         } catch (Exception $e) {
@@ -758,7 +758,7 @@ class ApiServiceController extends Controller
             ])->timeout(30)->post(env('PAN_TO_UAN_URL'), [
                         'pan_number' => $pan,
                     ]);
-            return $this->deductUserCredits($response, 6.00);
+            return $this->deductUserCredits($response, env('PAN_TO_UAN_COST'));
 
             // return $this->handleSurepassResponse($response);
         } catch (Exception $e) {
@@ -939,7 +939,7 @@ class ApiServiceController extends Controller
                 ->post(env('BANK_VERIFICATION_URL'), $payload);
 
 
-            return $this->deductUserBankCredits($response, 7.50);
+            return $this->deductUserBankCredits($response, env('BANK_ACCOUNT_VERIFY_COST'));
             // if ($response->successful()) {
             //     return response()->json([
             //         'success' => true,
@@ -1015,7 +1015,7 @@ class ApiServiceController extends Controller
                 ->post(env('PAN_VERIFICATION_URL'), $payload);
 
 
-            return $this->deductUserVerifyCredits($response, 10.50);
+            return $this->deductUserVerifyCredits($response, env('PAN_VERIFY_COST'));
             // return $this->handleResponse($response);
         } catch (Exception $e) {
             Log::error('PAN360 verification exception', [
@@ -1045,7 +1045,7 @@ class ApiServiceController extends Controller
             $response = Http::withHeaders($this->getHeaders())
                 ->timeout(30)
                 ->post(env('VOTER_ID_VERIFICATION_URL'), $payload);
-            return $this->deductUserVerifyCredits($response, 7.50);
+            return $this->deductUserVerifyCredits($response, env('VOTER_ID_VERIFY_COST'));
             // return $this->handleResponse($response);
         } catch (Exception $e) {
             return $this->handleVerificationException($e);
@@ -1106,7 +1106,7 @@ class ApiServiceController extends Controller
             $response = Http::withHeaders($this->getHeaders())
                 ->timeout(30)
                 ->post(env('EMPLOYMENT_VERIFICATION_URL'), $payload);
-            return $this->deductUserVerifyCredits($response, 18.00);
+            return $this->deductUserVerifyCredits($response, env('EMPLOYEMENT_VERIFY_COST'));
             // return $this->handleResponse($response);
         } catch (Exception $e) {
             return $this->handleVerificationException($e);
@@ -1134,7 +1134,7 @@ class ApiServiceController extends Controller
                 ->timeout(30)
                 ->post(env('PASSPORT_VERIFICATION_URL'), $payload);
 
-            return $this->deductUserVerifyCredits($response, 7.50);
+            return $this->deductUserVerifyCredits($response, env('PASSPORT_VERIFY_COST'));
         } catch (Exception $e) {
             return $this->handleVerificationException($e);
         }
@@ -1156,7 +1156,7 @@ class ApiServiceController extends Controller
             $response = Http::withHeaders($this->getHeaders())
                 ->timeout(30)
                 ->post(env('VEHICLE_RC_VERIFICATION_URL'), $payload);
-            return $this->deductUserVerifyCredits($response, 9.00);
+            return $this->deductUserVerifyCredits($response, env('VEHICLERC_VERIFY_COST'));
             // return $this->handleResponse($response);
         } catch (Exception $e) {
             return $this->handleVerificationException($e);
@@ -1179,7 +1179,7 @@ class ApiServiceController extends Controller
             $response = Http::withHeaders($this->getHeaders())
                 ->timeout(30)
                 ->post(env('IFSC_VERIFICATION_URL'), $payload);
-            return $this->deductUserVerifyCredits($response, 7.50);
+            return $this->deductUserVerifyCredits($response, env('IFSC_VERIFY_COST'));
             // return $this->handleResponse($response);
         } catch (Exception $e) {
             return $this->handleVerificationException($e);
@@ -1209,7 +1209,7 @@ class ApiServiceController extends Controller
             $response = Http::withHeaders($this->getHeaders())
                 ->timeout(30)
                 ->post(env('DRIVING_LICENSE_VERIFICATION_URL'), $payload);
-            return $this->deductUserVerifyCredits($response, 6.00);
+            return $this->deductUserVerifyCredits($response, env('DRIVING_LICENSE_VERIFY_COST'));
             // return $this->handleResponse($response);
         } catch (Exception $e) {
             return $this->handleVerificationException($e);

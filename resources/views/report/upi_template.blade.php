@@ -42,20 +42,24 @@
 
   @foreach ($data as $key => $value)
     @if (!is_null($value) && strtolower($value) !== 'n/a')
-    <div class="field">
-    <div class="label">{{ ucwords(str_replace('_', ' ', $key)) }}</div>
-    <div>
-      @if ($value === true)
-      <span class="yes">Yes</span>
-    @elseif ($value === false)
-      <span class="no">No</span>
-    @else
-      {{ $value }}
-    @endif
-    </div>
-    </div>
+      <div class="field">
+        <div class="label">{{ ucwords(str_replace('_', ' ', $key)) }}</div>
+        <div>
+          @if ($value === true)
+            <span class="yes">Yes</span>
+          @elseif ($value === false)
+            <span class="no">No</span>
+          @else
+            {{ $value }}
+          @endif
+        </div>
+      </div>
     @endif
   @endforeach
+
+  <div>
+    <p><strong>Downloaded by:</strong> {{ $userEmail }}</p>
+  </div>
 
 </body>
 
