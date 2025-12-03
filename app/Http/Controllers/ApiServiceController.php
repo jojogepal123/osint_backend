@@ -13,6 +13,9 @@ use GuzzleHttpException\RequestException; // Import this
 use Illuminate\Support\Facades\Storage;
 use Exception;
 use Throwable;
+use libphonenumber\PhoneNumberUtil;
+use libphonenumber\NumberParseException;
+
 
 class ApiServiceController extends Controller
 {
@@ -28,21 +31,47 @@ class ApiServiceController extends Controller
                 'number' => ['required', 'string', 'max:15'],
             ]);
 
-            $number = $this->sanitizePhoneNumber($request->query('number'));
-            $localNumber = preg_replace('/^91/', '', $number); // for India
+            Log::info($request->query('number'));
+
+            $raw = $this->sanitizePhoneNumber($request->query('number'));
+            $raw = ltrim($raw, '+');
+
+            $phoneUtil = PhoneNumberUtil::getInstance();
+            try {
+                // parse with null region so numbers starting with country code are understood
+                $proto = $phoneUtil->parse($raw, "IN");
+
+                // Validate
+                if (!$phoneUtil->isValidNumber($proto)) {
+                    Log::warning('libphonenumber: invalid number', ['raw' => $raw]);
+                    return response()->json(['error' => 'Invalid phone number.'], 422);
+                }
+
+                $countryCode = (string) $proto->getCountryCode();
+                $localNumber = (string) $proto->getNationalNumber();
+
+                Log::info('Parsed phone via libphonenumber', ['raw' => $raw, 'code' => $countryCode, 'local' => $localNumber]);
+            } catch (NumberParseException $ex) {
+                Log::warning('libphonenumber parse failed', ['raw' => $raw, 'error' => $ex->getMessage()]);
+                return response()->json(['error' => 'Unable to parse phone number.'], 422);
+            }
+
+            $number = $raw;
             $user = auth()->user();
             $urls = [
                 'osint' => env('OSINTDATA_URL'),
                 'truecaller' => env('TRUECALLERDATA_URL'),
+                'viewcaller' => env('VIEW_CALLER'),
+                'sync' => env('SYNCDATA'),
                 'whatsapp' => env('WHATSAPPDATA_URL'),
                 'telegram' => env('TELEGRAMDATA_URL'),
                 // 'allmobile' => env('ALLMOBILEDATA_URL'),
                 'callerapi' => env('CALL_PRES_URL'),
                 // 'socialmedia' => env('SOCIALMEDIADATA_URL'),
-                'spkyc' => env('SPKYC_URL'),
-                'spupi' => env('SPUPI_URL'),
+                // 'spkyc' => env('SPKYC_URL'),
+                // 'spupi' => env('SPUPI_URL'),
                 // 'spbank' => env('SPBANK_URL'),
-                'sprc' => env('SPRC_URL'),
+                // 'sprc' => env('SPRC_URL'),
 
             ];
 
@@ -60,6 +89,34 @@ class ApiServiceController extends Controller
                         'x-rapidapi-host' => env('TRUECALLER_API_HOST'),
                     ])->timeout(40)->get($urls['truecaller'] . "/{$number}"),
 
+
+                    // 'vcData' => fn($pool) => $pool->withHeaders([
+                    //     'x-rapidapi-key' => env('VIEWCALLER_API_KEY'),
+                    //     'x-rapidapi-host' => env('VIEWCALLER_API_HOST'),
+                    // ])->timeout(40)->get($urls['viewcaller'] . "code={$countryCode}&number={$localNumber}"),
+
+                    // 'syncData' => fn($pool) => $pool->withHeaders([
+                    //     'x-rapidapi-key' => env('SYNC_API_KEY'),
+                    //     'x-rapidapi-host' => env('SYNC_API_HOST'),
+                    // ])->timeout(40)->get($urls['sync'] . "number={$localNumber}&code={$countryCode}"),
+
+                    // VIEWCALLER: send query params properly (not string concat)
+                    'vcData' => fn($pool) => $pool->withHeaders([
+                        'x-rapidapi-key' => env('VIEWCALLER_API_KEY'),
+                        'x-rapidapi-host' => env('VIEWCALLER_API_HOST'),
+                    ])->timeout(40)->get($urls['viewcaller'], [
+                                'code' => $countryCode,
+                                'number' => $localNumber,
+                            ]),
+
+                    // SYNC: query params as array (note code param order doesn't matter)
+                    'syncData' => fn($pool) => $pool->withHeaders([
+                        'x-rapidapi-key' => env('SYNC_API_KEY'),
+                        'x-rapidapi-host' => env('SYNC_API_HOST'),
+                    ])->timeout(40)->get($urls['sync'], [
+                                'number' => $localNumber,
+                                'code' => $countryCode,
+                            ]),
                     'wpData' => fn($pool) => $pool->withHeaders([
                         'x-rapidapi-key' => env('TEL_API_KEY'),
                         'x-rapidapi-host' => env('TEL_API_HOST'),
@@ -83,18 +140,18 @@ class ApiServiceController extends Controller
                     //     'x-rapidapi-host' => env('SOCIAL_MEDIA_API_HOST'),
                     // ])->timeout(30)->get($urls['socialmedia'] . "/?phone={$number}"),
 
-                    'sKData' => fn($pool) => $pool->withHeaders([
-                        'Content-Type' => 'application/json',
-                        'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
-                    ])->timeout(40)->post($urls['spkyc'], [
-                                'mobile' => $localNumber,
-                            ]),
-                    'suData' => fn($pool) => $pool->withHeaders([
-                        'Content-Type' => 'application/json',
-                        'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
-                    ])->timeout(40)->post($urls['spupi'], [
-                                'mobile_number' => $localNumber,
-                            ]),
+                    // 'sKData' => fn($pool) => $pool->withHeaders([
+                    //     'Content-Type' => 'application/json',
+                    //     'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
+                    // ])->timeout(40)->post($urls['spkyc'], [
+                    //             'mobile' => $localNumber,
+                    //         ]),
+                    // 'suData' => fn($pool) => $pool->withHeaders([
+                    //     'Content-Type' => 'application/json',
+                    //     'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
+                    // ])->timeout(40)->post($urls['spupi'], [
+                    //             'mobile_number' => $localNumber,
+                    //         ]),
 
                     // 'sbData' => fn($pool) => $pool->withHeaders([
                     //     'Content-Type' => 'application/json',
@@ -102,12 +159,12 @@ class ApiServiceController extends Controller
                     // ])->timeout(30)->post($urls['spbank'], [
                     //             'mobile_no' => $localNumber,
                     //         ]),
-                    'srData' => fn($pool) => $pool->withHeaders([
-                        'Content-Type' => 'application/json',
-                        'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
-                    ])->timeout(40)->post($urls['sprc'], [
-                                'mobile_number' => $localNumber,
-                            ]),
+                    // 'srData' => fn($pool) => $pool->withHeaders([
+                    //     'Content-Type' => 'application/json',
+                    //     'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
+                    // ])->timeout(40)->post($urls['sprc'], [
+                    //             'mobile_number' => $localNumber,
+                    //         ]),
 
                 ];
                 $responses = Http::pool(fn($pool) => array_map(fn($req) => $req($pool), $requests));
@@ -185,6 +242,10 @@ class ApiServiceController extends Controller
                     ], 402);
                 }
             }
+
+            Log::info($data);
+
+            Log::info('Calling viewcaller', ['url' => $urls['viewcaller'], 'params' => ['code' => $countryCode, 'number' => $localNumber]]);
 
             return response()->json([
                 ...$data,
