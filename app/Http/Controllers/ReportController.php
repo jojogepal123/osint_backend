@@ -131,7 +131,7 @@ class ReportController extends Controller
         $response = Http::timeout(20)
             ->retry(3, 200)
             ->post(
-                'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' . env('GEMINI_API_KEY'),
+                'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' . env('GEMINI_API_KEY'),
                 [
                     'contents' => [
                         [
@@ -158,9 +158,7 @@ class ReportController extends Controller
 
         // Now decode the clean JSON
         $responseData = json_decode($cleanJson, true);
-
-
-        // 🧾 Fallback-safe values
+        // Fallback-safe values
         $summary = $responseData['intelligenceSummary'] ?? 'No summary generated.';
         $riskLevel = $responseData['riskLevel'] ?? 'Unknown';
         $nextSteps = $responseData['nextSteps'] ?? [];
@@ -289,7 +287,7 @@ class ReportController extends Controller
 
         $filename = 'challan_details_' . now()->format('Ymd_His') . '_' . Str::uuid() . '.pdf';
         $filePath = storage_path("app/private/reports/{$filename}");
-        \Storage::makeDirectory('private/reports');
+        Storage::makeDirectory('private/reports');
 
         try {
             $html = View::make('report.challan_template', [

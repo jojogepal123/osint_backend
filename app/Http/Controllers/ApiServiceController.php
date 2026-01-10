@@ -24,8 +24,55 @@ class ApiServiceController extends Controller
         return preg_replace('/\D/', '', $number);
     }
 
+    private function fetchOsPhoneData(string $number): ?array
+    {
+        try {
+            $response = Http::withHeaders([
+                'api-key' => env('OSINT_API_KEY'),
+                'accept' => 'application/json',
+            ])
+                ->withOptions([
+                    'connect_timeout' => 8,   // fail quickly if we can't connect
+                ])
+                ->timeout(20)                // ❗ hard limit: 20 seconds, well below 60
+                ->get(env('OSINT_PHONE', 'https://api.osint.industries/v2/request'), [
+                    'type' => 'phone',
+                    'query' => $number,
+                    'timeout' => 20,          // OSINT internal timeout, <= 80
+                ]);
+
+            if ($response->successful()) {
+                return $response->json();
+            }
+
+            Log::warning('osPhoneData failed', [
+                'status' => $response->status(),
+                'body' => $response->body(),
+            ]);
+        } catch (ConnectionException $e) {
+            // This is where cURL error 28 will land
+            Log::warning('osPhoneData connection/timeout', [
+                'message' => $e->getMessage(),
+            ]);
+        } catch (Throwable $e) {
+            Log::error('osPhoneData unexpected error', [
+                'message' => $e->getMessage(),
+            ]);
+        }
+
+        return null; // no data, but no fatal error
+    }
+
+
+
     public function getTelData(Request $request)
     {
+        // Make sure this request itself is allowed to run longer than 60s (if needed)
+        // ini_set('max_execution_time', '180'); // 180 seconds
+        // set_time_limit(180);                  // some SAPIs respect this better
+        // Log::info('PHP max_execution_time', [
+        //     'value' => ini_get('max_execution_time'),
+        // ]);
         try {
             $request->validate([
                 'number' => ['required', 'string', 'max:15'],
@@ -61,8 +108,8 @@ class ApiServiceController extends Controller
             $urls = [
                 'osint' => env('OSINTDATA_URL'),
                 'truecaller' => env('TRUECALLERDATA_URL'),
-                'viewcaller' => env('VIEW_CALLER'),
-                'sync' => env('SYNCDATA'),
+                // 'viewcaller' => env('VIEW_CALLER'),
+                // 'sync' => env('SYNCDATA'),
                 'whatsapp' => env('WHATSAPPDATA_URL'),
                 'telegram' => env('TELEGRAMDATA_URL'),
                 // 'allmobile' => env('ALLMOBILEDATA_URL'),
@@ -72,6 +119,7 @@ class ApiServiceController extends Controller
                 // 'spupi' => env('SPUPI_URL'),
                 // 'spbank' => env('SPBANK_URL'),
                 // 'sprc' => env('SPRC_URL'),
+                // 'osphone' => env('OSINT_PHONE'),
 
             ];
 
@@ -90,33 +138,31 @@ class ApiServiceController extends Controller
                     ])->timeout(40)->get($urls['truecaller'] . "/{$number}"),
 
 
+                    // 'osPhoneData' => fn($pool) => $pool->withHeaders([
+                    //     'api-key' => env('OSINT_API_KEY'),
+                    //     'accept' => 'application/json',
+                    // ])->timeout(40)->get($urls['osphone'], [
+                    //             'type' => 'phone',
+                    //             'query' => $number,
+                    //             'timeout' => 60,
+                    //         ]),
+                    // VIEWCALLER: send query params properly (not string concat)
                     // 'vcData' => fn($pool) => $pool->withHeaders([
                     //     'x-rapidapi-key' => env('VIEWCALLER_API_KEY'),
                     //     'x-rapidapi-host' => env('VIEWCALLER_API_HOST'),
-                    // ])->timeout(40)->get($urls['viewcaller'] . "code={$countryCode}&number={$localNumber}"),
+                    // ])->timeout(40)->get($urls['viewcaller'], [
+                    //             'code' => $countryCode,
+                    //             'number' => $localNumber,
+                    //         ]),
 
+                    // // SYNC: query params as array (note code param order doesn't matter)
                     // 'syncData' => fn($pool) => $pool->withHeaders([
                     //     'x-rapidapi-key' => env('SYNC_API_KEY'),
                     //     'x-rapidapi-host' => env('SYNC_API_HOST'),
-                    // ])->timeout(40)->get($urls['sync'] . "number={$localNumber}&code={$countryCode}"),
-
-                    // VIEWCALLER: send query params properly (not string concat)
-                    'vcData' => fn($pool) => $pool->withHeaders([
-                        'x-rapidapi-key' => env('VIEWCALLER_API_KEY'),
-                        'x-rapidapi-host' => env('VIEWCALLER_API_HOST'),
-                    ])->timeout(40)->get($urls['viewcaller'], [
-                                'code' => $countryCode,
-                                'number' => $localNumber,
-                            ]),
-
-                    // SYNC: query params as array (note code param order doesn't matter)
-                    'syncData' => fn($pool) => $pool->withHeaders([
-                        'x-rapidapi-key' => env('SYNC_API_KEY'),
-                        'x-rapidapi-host' => env('SYNC_API_HOST'),
-                    ])->timeout(40)->get($urls['sync'], [
-                                'number' => $localNumber,
-                                'code' => $countryCode,
-                            ]),
+                    // ])->timeout(40)->get($urls['sync'], [
+                    //             'number' => $localNumber,
+                    //             'code' => $countryCode,
+                    //         ]),
                     'wpData' => fn($pool) => $pool->withHeaders([
                         'x-rapidapi-key' => env('TEL_API_KEY'),
                         'x-rapidapi-host' => env('TEL_API_HOST'),
@@ -126,8 +172,9 @@ class ApiServiceController extends Controller
                     'telData' => fn($pool) => $pool->withHeaders([
                         'Content-Type' => 'application/json',
                     ])->timeout(30)->post($urls['telegram'], [
-                                'phone' => $number,
+                                'phone' => '+' . $number,
                             ]),
+
 
 
                     // 'allData' => fn($pool) => $pool->withHeaders([
@@ -242,10 +289,14 @@ class ApiServiceController extends Controller
                     ], 402);
                 }
             }
+            $osPhoneJson = $this->fetchOsPhoneData($number);
+            $data['osPhoneData'] = $osPhoneJson;
+            if ($osPhoneJson) {
+                $anySuccessful = true; // if you want it to count for credits
+            }
 
             Log::info($data);
 
-            Log::info('Calling viewcaller', ['url' => $urls['viewcaller'], 'params' => ['code' => $countryCode, 'number' => $localNumber]]);
 
             return response()->json([
                 ...$data,
@@ -260,6 +311,8 @@ class ApiServiceController extends Controller
             return response()->json(['error' => 'An internal server error occurred.'], 500);
         }
     }
+
+
     public function getEmailData(Request $request)
     {
         try {
@@ -279,6 +332,7 @@ class ApiServiceController extends Controller
                 'socialscan' => env('SOCIALSCAN_URL'),
                 'hibp' => env('HIBPDATA_URL') . "/{$email}",
                 'getuser' => env('GETUSER_API_BASE') . "?email={$encodedEmail}&apikey=" . env('GETUSER_API_KEY'),
+                // 'osEmail' => env('OSINT_EMAIL'),
             ];
 
             $requests = [
@@ -287,6 +341,13 @@ class ApiServiceController extends Controller
                 ])->timeout(30)->get($urls['osint'], ['email' => $email, 'per_page' => 50]),
 
                 'zehefData' => fn($pool) => $pool->timeout(60)->post($urls['zehef'], ['email' => $email]),
+                // 'osEmailData' => fn($pool) => $pool->withHeaders([
+                //     'api-key' => env('OSINT_API_KEY'),
+                //     'accept' => 'application/json',
+                // ])->timeout(30)->get($urls['osEmail'], [
+                //             'query' => $email,
+                //             'timeout' => 60
+                //         ]),
                 'holeheData' => fn($pool) => $pool->timeout(30)->post($urls['holehe'], ['email' => $email]),
                 'socialScanData' => fn($pool) => $pool->timeout(30)->asJson()->post($urls['socialscan'], ['email' => $email]),
                 'emailData' => fn($pool) => $pool->timeout(30)->asJson()->post($urls['gmail'], ['email' => $email]),

@@ -70,6 +70,7 @@ class AuthController extends Controller
             // Always send new OTP if device is new OR OTP expired
             $otp = rand(100000, 999999);
             $user->otp = $otp;
+            Log::info("Otp is sent {$user->email}: " . $otp);
             $user->otp_expires_at = now()->addMinutes(5);
             $user->save();
 
