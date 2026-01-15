@@ -169,11 +169,11 @@ class ApiServiceController extends Controller
                     ])->timeout(40)->get($urls['whatsapp'] . "/{$number}"),
 
 
-                    'telData' => fn($pool) => $pool->withHeaders([
-                        'Content-Type' => 'application/json',
-                    ])->retry(3, 300)->timeout(30)->post($urls['telegram'], [
-                                'phone' => '+' . $number,
-                            ]),
+                    // 'telData' => fn($pool) => $pool->withHeaders([
+                    //     'Content-Type' => 'application/json',
+                    // ])->retry(3, 300)->timeout(30)->post($urls['telegram'], [
+                    //             'phone' => '+' . $number,
+                    //         ]),
 
 
 
@@ -243,6 +243,29 @@ class ApiServiceController extends Controller
                 Log::error('HLR API Error', [
                     'number' => $number,
                     'error' => $th->getMessage(),
+                ]);
+            }
+
+            $data['telData'] = null;
+
+            try {
+                $telResponse = Http::timeout(120)
+                    ->connectTimeout(5)
+                    ->post($urls['telegram'], [
+                            'phone' => '+' . $number,
+                        ]);
+
+                if ($telResponse->successful()) {
+                    $data['telData'] = $telResponse->json();
+                } else {
+                    Log::warning('[telData] API Failed', [
+                        'status' => $telResponse->status(),
+                        'body' => $telResponse->body(),
+                    ]);
+                }
+            } catch (Throwable $e) {
+                Log::error('[telData] API Exception', [
+                    'message' => $e->getMessage(),
                 ]);
             }
 
