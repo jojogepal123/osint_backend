@@ -32,8 +32,8 @@ class ApiServiceController extends Controller
                 'accept' => 'application/json',
             ])
                 ->withOptions([
-                    'connect_timeout' => 8,   // fail quickly if we can't connect
-                ])
+                        'connect_timeout' => 8,   // fail quickly if we can't connect
+                    ])
                 ->timeout(20)                // ❗ hard limit: 20 seconds, well below 60
                 ->get(env('OSINT_PHONE', 'https://api.osint.industries/v2/request'), [
                     'type' => 'phone',
@@ -171,7 +171,7 @@ class ApiServiceController extends Controller
 
                     'telData' => fn($pool) => $pool->withHeaders([
                         'Content-Type' => 'application/json',
-                    ])->timeout(30)->post($urls['telegram'], [
+                    ])->retry(3, 300)->timeout(30)->post($urls['telegram'], [
                                 'phone' => '+' . $number,
                             ]),
 
