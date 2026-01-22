@@ -57,5 +57,9 @@ class User extends Authenticatable
     {
         return $this->hasMany(UserIp::class);
     }
+    public function searchQueries()
+    {
+        return $this->hasMany(\App\Models\SearchQuery::class);
+    }
 
 }

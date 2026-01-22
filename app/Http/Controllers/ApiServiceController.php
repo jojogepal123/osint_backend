@@ -15,6 +15,7 @@ use Exception;
 use Throwable;
 use libphonenumber\PhoneNumberUtil;
 use libphonenumber\NumberParseException;
+use App\Models\SearchQuery;
 
 
 class ApiServiceController extends Controller
@@ -32,8 +33,8 @@ class ApiServiceController extends Controller
                 'accept' => 'application/json',
             ])
                 ->withOptions([
-                        'connect_timeout' => 8,   // fail quickly if we can't connect
-                    ])
+                    'connect_timeout' => 8,   // fail quickly if we can't connect
+                ])
                 ->timeout(20)                // ❗ hard limit: 20 seconds, well below 60
                 ->get(env('OSINT_PHONE', 'https://api.osint.industries/v2/request'), [
                     'type' => 'phone',
@@ -73,6 +74,10 @@ class ApiServiceController extends Controller
         // Log::info('PHP max_execution_time', [
         //     'value' => ini_get('max_execution_time'),
         // ]);
+        $user = auth()->user();
+
+        /* Save phone search query */
+
         try {
             $request->validate([
                 'number' => ['required', 'string', 'max:15'],
@@ -84,6 +89,16 @@ class ApiServiceController extends Controller
             $raw = ltrim($raw, '+');
 
             $phoneUtil = PhoneNumberUtil::getInstance();
+
+            $number = $raw;
+
+            $user = auth()->user();
+
+            SearchQuery::create([
+                'user_id' => $user->id,
+                'query' => $number,
+                'ip_address' => $request->ip(),
+            ]);
             try {
                 // parse with null region so numbers starting with country code are understood
                 $proto = $phoneUtil->parse($raw, "IN");
@@ -113,12 +128,12 @@ class ApiServiceController extends Controller
                 'whatsapp' => env('WHATSAPPDATA_URL'),
                 'telegram' => env('TELEGRAMDATA_URL'),
                 // 'allmobile' => env('ALLMOBILEDATA_URL'),
-                'callerapi' => env('CALL_PRES_URL'),
+                // 'callerapi' => env('CALL_PRES_URL'),
                 // 'socialmedia' => env('SOCIALMEDIADATA_URL'),
-                'spkyc' => env('SPKYC_URL'),
-                'spupi' => env('SPUPI_URL'),
+                // 'spkyc' => env('SPKYC_URL'),
+                // 'spupi' => env('SPUPI_URL'),
                 // 'spbank' => env('SPBANK_URL'),
-                'sprc' => env('SPRC_URL'),
+                // 'sprc' => env('SPRC_URL'),
                 // 'osphone' => env('OSINT_PHONE'),
 
             ];
@@ -187,18 +202,18 @@ class ApiServiceController extends Controller
                     //     'x-rapidapi-host' => env('SOCIAL_MEDIA_API_HOST'),
                     // ])->timeout(30)->get($urls['socialmedia'] . "/?phone={$number}"),
 
-                    'sKData' => fn($pool) => $pool->withHeaders([
-                        'Content-Type' => 'application/json',
-                        'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
-                    ])->timeout(40)->post($urls['spkyc'], [
-                                'mobile' => $localNumber,
-                            ]),
-                    'suData' => fn($pool) => $pool->withHeaders([
-                        'Content-Type' => 'application/json',
-                        'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
-                    ])->timeout(40)->post($urls['spupi'], [
-                                'mobile_number' => $localNumber,
-                            ]),
+                    // 'sKData' => fn($pool) => $pool->withHeaders([
+                    //     'Content-Type' => 'application/json',
+                    //     'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
+                    // ])->timeout(40)->post($urls['spkyc'], [
+                    //             'mobile' => $localNumber,
+                    //         ]),
+                    // 'suData' => fn($pool) => $pool->withHeaders([
+                    //     'Content-Type' => 'application/json',
+                    //     'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
+                    // ])->timeout(40)->post($urls['spupi'], [
+                    //             'mobile_number' => $localNumber,
+                    //         ]),
 
                     // 'sbData' => fn($pool) => $pool->withHeaders([
                     //     'Content-Type' => 'application/json',
@@ -206,12 +221,12 @@ class ApiServiceController extends Controller
                     // ])->timeout(30)->post($urls['spbank'], [
                     //             'mobile_no' => $localNumber,
                     //         ]),
-                    'srData' => fn($pool) => $pool->withHeaders([
-                        'Content-Type' => 'application/json',
-                        'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
-                    ])->timeout(40)->post($urls['sprc'], [
-                                'mobile_number' => $localNumber,
-                            ]),
+                    // 'srData' => fn($pool) => $pool->withHeaders([
+                    //     'Content-Type' => 'application/json',
+                    //     'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
+                    // ])->timeout(40)->post($urls['sprc'], [
+                    //             'mobile_number' => $localNumber,
+                    //         ]),
 
                 ];
                 $responses = Http::pool(fn($pool) => array_map(fn($req) => $req($pool), $requests));
@@ -252,8 +267,8 @@ class ApiServiceController extends Controller
                 $telResponse = Http::timeout(120)
                     ->connectTimeout(5)
                     ->post($urls['telegram'], [
-                            'phone' => '+' . $number,
-                        ]);
+                        'phone' => '+' . $number,
+                    ]);
 
                 if ($telResponse->successful()) {
                     $data['telData'] = $telResponse->json();
@@ -344,6 +359,14 @@ class ApiServiceController extends Controller
             ]);
 
             $email = $request->query('email');
+            $user = auth()->user();
+
+            SearchQuery::create([
+                'user_id' => $user->id,
+                'query' => $email,
+                'ip_address' => $request->ip(),
+            ]);
+
             $encodedEmail = urlencode($email);
             $user = auth()->user();
 
@@ -450,7 +473,12 @@ class ApiServiceController extends Controller
 
         $upiId = $request->input('upi_id');
 
-
+        $user = auth()->user();
+        SearchQuery::create([
+            'user_id' => $user->id,
+            'query' => $upiId,
+            'ip_address' => $request->ip(),
+        ]);
         try {
             $response = Http::withHeaders([
                 'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
@@ -462,7 +490,7 @@ class ApiServiceController extends Controller
             if ($response->successful()) {
                 $data = $response->json();
                 $deduction = env('UPI_COST');
-                $user = auth()->user();
+
 
                 // Check if user has sufficient credits
                 if ($user->credits >= $deduction) {
@@ -502,6 +530,14 @@ class ApiServiceController extends Controller
         ]);
 
         $idNumber = $request->input('id_number');
+        $user = auth()->user();
+
+        // ✅ Store search query + IP
+        SearchQuery::create([
+            'user_id' => $user->id,
+            'query' => $idNumber,
+            'ip_address' => $request->ip(),
+        ]);
 
 
         try {
@@ -515,7 +551,7 @@ class ApiServiceController extends Controller
             if ($response->successful()) {
                 $data = $response->json();
                 $deduction = env('RC_COST');
-                $user = auth()->user();
+
 
                 // Check if user has sufficient credits
                 if ($user->credits >= $deduction) {
@@ -555,6 +591,14 @@ class ApiServiceController extends Controller
         ]);
 
         $rcNumber = $request->input('rc_number');
+        $user = auth()->user();
+
+        // ✅ Store search query + IP
+        SearchQuery::create([
+            'user_id' => $user->id,
+            'query' => $rcNumber,
+            'ip_address' => $request->ip(),
+        ]);
 
 
         try {
@@ -567,7 +611,7 @@ class ApiServiceController extends Controller
 
             if ($response->successful()) {
                 // Deduct 7.00 credits from authenticated user
-                $user = auth()->user();
+
                 if ($user->credits >= 7) {
                     $user->credits -= env('RC_CHALLAN_COST');
                     $user->save();
@@ -608,6 +652,13 @@ class ApiServiceController extends Controller
             return response()->json(['error' => 'Invalid search data'], 400);
         }
 
+        $user = auth()->user();
+        SearchQuery::create([
+            'user_id' => $user->id,
+            'query' => json_encode($data),
+            'ip_address' => $request->ip(),
+        ]);
+
         $params = [
             'page' => $page,
             'per_page' => $perPage,
@@ -639,7 +690,7 @@ class ApiServiceController extends Controller
                 $anySuccessful = true;
                 if ($anySuccessful) {
                     $deduction = env('LEAKDATA_COST');
-                    $user = auth()->user();
+
                     if ($user->credits >= $deduction) {
                         $user->credits -= $deduction;
                         $user->save();
@@ -676,6 +727,12 @@ class ApiServiceController extends Controller
         if (!$type || !$data) {
             return response()->json(['error' => 'Invalid search request'], 400);
         }
+        $user = auth()->user();
+        SearchQuery::create([
+            'user_id' => $user->id,
+            'query' => json_encode($data),
+            'ip_address' => $request->ip(),
+        ]);
 
         switch ($type) {
             case 'corporate_gstin':
@@ -976,7 +1033,12 @@ class ApiServiceController extends Controller
         ]);
         $type = $request->input('type');
         $data = $request->input('data');
-
+        $user = auth()->user();
+        SearchQuery::create([
+            'user_id' => $user->id,
+            'query' => json_encode($data),
+            'ip_address' => $request->ip(),
+        ]);
         if (!$type || !$data) {
             Log::error('Missing type or data in request');
             return response()->json(['error' => 'Invalid search request'], 400);
