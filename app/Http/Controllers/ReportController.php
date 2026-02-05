@@ -102,7 +102,10 @@ class ReportController extends Controller
 
                 if (!$url)
                     continue;
-
+                // ✅ if url is relative, make it absolute
+                if (Str::startsWith($url, '/')) {
+                    $url = config('app.furl') . $url;
+                }
                 $base64 = $this->getImageBase64($url);
 
                 if ($base64) {
