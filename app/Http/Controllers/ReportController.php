@@ -46,19 +46,23 @@ class ReportController extends Controller
         // Ensure directory exists
         Storage::makeDirectory('/reports');
 
-        if (!empty($data['profile']['profileImages']) && is_array($data['profile']['profileImages'])) {
+        $profileImages = data_get($data, "profile.profileImages", []);
 
-            foreach ($data['profile']['profileImages'] as $key => $img) {
+        if (is_array($profileImages)) {
 
+            foreach ($profileImages as $key => $img) {
+
+                $source = $img['source'] ?? 'Unknown';
                 $url = $img['value'] ?? null;
 
-                if (!$url) {
+                if (!$url)
                     continue;
+
+                // Fix Telegram relative path
+                if ($source === "Telegram" && Str::startsWith($url, '/telegram_photos/')) {
+                    $url = rtrim(env('FRONTEND_URL'), '/') . $url;
                 }
 
-                if (Str::startsWith($url, '/')) {
-                    $url = rtrim(config('app.furl'), '/') . $url;
-                }
                 $base64 = $this->getImageBase64($url);
 
                 if ($base64) {
