@@ -15,17 +15,58 @@ use Illuminate\Support\Facades\Validator;
 class ReportController extends Controller
 {
 
+    // private function getImageBase64($url)
+    // {
+    //     try {
+    //         $imgData = file_get_contents($url);
+    //         $type = pathinfo($url, PATHINFO_EXTENSION);
+    //         return 'data:image/' . $type . ';base64,' . base64_encode($imgData);
+    //     } catch (Exception $e) {
+    //         return null;
+    //     }
+    // }
+
     private function getImageBase64($url)
     {
         try {
-            $imgData = file_get_contents($url);
-            $type = pathinfo($url, PATHINFO_EXTENSION);
-            return 'data:image/' . $type . ';base64,' . base64_encode($imgData);
+            if (!$url) {
+                return null;
+            }
+
+            // ✅ Convert relative url to full url automatically
+            // /telegram_photos/abc.jpg -> https://api.mydomain.com/telegram_photos/abc.jpg
+            if (Str::startsWith($url, '/')) {
+                $url = rtrim(config('app.furl'), '/') . $url;
+            }
+
+            // ✅ Fetch image using Laravel HTTP client
+            $response = Http::timeout(15)->get($url);
+
+            if (!$response->successful()) {
+                return null;
+            }
+
+            $imgData = $response->body();
+
+            // detect extension safely
+            $path = parse_url($url, PHP_URL_PATH);
+            $ext = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+
+            // detect mime
+            $mime = "image/jpeg";
+            if ($ext === "png")
+                $mime = "image/png";
+            if ($ext === "webp")
+                $mime = "image/webp";
+            if ($ext === "gif")
+                $mime = "image/gif";
+
+            return "data:$mime;base64," . base64_encode($imgData);
+
         } catch (Exception $e) {
             return null;
         }
     }
-
 
     public function generateReport(Request $request)
     {
@@ -47,7 +88,23 @@ class ReportController extends Controller
         // Ensure directory exists
         Storage::makeDirectory('/reports');
 
+        if (!empty($data['profile']['profileImages']) && is_array($data['profile']['profileImages'])) {
 
+            foreach ($data['profile']['profileImages'] as $key => $img) {
+
+                $url = $img['value'] ?? null;
+
+                if (!$url) {
+                    continue;
+                }
+
+                $base64 = $this->getImageBase64($url);
+
+                if ($base64) {
+                    $data['profile']['profileImages'][$key]['base64'] = $base64;
+                }
+            }
+        }
 
         // Render view based on type
         if ($type === 'tel') {
@@ -102,10 +159,7 @@ class ReportController extends Controller
 
                 if (!$url)
                     continue;
-                // ✅ if url is relative, make it absolute
-                if (Str::startsWith($url, '/')) {
-                    $url = config('app.furl') . $url;
-                }
+
                 $base64 = $this->getImageBase64($url);
 
                 if ($base64) {

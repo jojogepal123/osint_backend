@@ -154,17 +154,28 @@
     {{-- Profile Images --}}
     @if(!empty($profile['profileImages']))
         <div class="section">
-            <h2>Profile Images</h2>
-            <div class="profile-images">
-                @foreach($profile['profileImages'] as $img)
-                    <div class="image-box">
-                        <img src="{{ $img['value'] }}" alt="Profile Image">
-                        @if(!empty($img['source']))
-                            <div class="source-label">(Source: {{ $img['source'] }})</div>
-                        @endif
-                    </div>
+            <h2 style="margin-top:15px;">Profile Images</h2>
+
+            <table width="100%" cellspacing="0" cellpadding="10">
+                @foreach(array_chunk($data['profile']['profileImages'], 2) as $row)
+                    <tr>
+                        @foreach($row as $img)
+                            <td align="center" style="border:1px solid #ddd; width:50%;">
+                                <p style="font-size:12px;margin:0 0 6px 0;">
+                                    <strong>{{ $img['source'] ?? 'Unknown' }}</strong>
+                                </p>
+
+                                @if(!empty($img['base64']))
+                                    <img src="{{ $img['base64'] }}"
+                                        style="width:110px;height:110px;border-radius:12px;border:1px solid #ccc;" />
+                                @else
+                                    <p style="font-size:12px;color:#888;">Image not available</p>
+                                @endif
+                            </td>
+                        @endforeach
+                    </tr>
                 @endforeach
-            </div>
+            </table>
         </div>
     @endif
 
