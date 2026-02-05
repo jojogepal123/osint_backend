@@ -90,6 +90,32 @@ class ReportController extends Controller
 
         $userEmail = Auth::check() ? Auth::user()->email : 'N/A';
 
+        $profileImages = data_get($results, 'profile.profileImages', []);
+        $profileImagesForPdf = [];
+
+
+        if (is_array($profileImages)) {
+            foreach ($profileImages as $img) {
+
+                $platform = $img['source'] ?? 'Unknown';
+                $url = $img['value'] ?? null;
+
+                if (!$url)
+                    continue;
+
+                $base64 = $this->getImageBase64($url);
+
+                if ($base64) {
+                    $profileImagesForPdf[] = [
+                        'platform' => $platform,
+                        'url' => $url,
+                        'base64' => $base64,
+                    ];
+                }
+            }
+        }
+
+
 
         $prettyResults = json_encode($results, JSON_PRETTY_PRINT);
 
@@ -184,9 +210,10 @@ class ReportController extends Controller
             'type' => $type,
             'results' => $results,
             'userEmail' => $userEmail, // full original results
+            'profileImagesForPdf' => $profileImagesForPdf,
         ]);
 
-
+        // Log::info("PDF Images", $profileImagesForPdf);
 
         $filename = 'ai-report-' . Str::slug($userInput) . '.pdf';
 

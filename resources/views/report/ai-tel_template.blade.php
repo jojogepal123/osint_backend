@@ -182,6 +182,27 @@
         </div>
     @endif
 
+    @if(!empty($profileImagesForPdf))
+        <div class="section">
+            <h2 style="margin-top: 15px;">Profile Images</h2>
+
+            <table width="100%" cellspacing="0" cellpadding="10">
+                <tr>
+                    @foreach($profileImagesForPdf as $img)
+                        <td align="center" style="border:1px solid #ddd;">
+                            <p style="font-size:12px;margin:0 0 6px 0;">
+                                <strong>{{ $img['platform'] }}</strong>
+                            </p>
+
+                            <img src="{{ $img['base64'] }}"
+                                style="width:110px;height:110px;border-radius:12px;border:1px solid #ccc;" />
+                        </td>
+                    @endforeach
+                </tr>
+            </table>
+        </div>
+    @endif
+
     @if(!empty($profileHighlights))
         <div class="section">
             <h2>[Highlights] Profile Highlights</h2>
