@@ -1,0 +1,33 @@
+# Development — includes dev dependencies, code is mounted via volume at runtime
+FROM php:8.2-fpm
+
+RUN apt-get update && apt-get install -y \
+    git curl zip unzip libpng-dev libonig-dev libxml2-dev \
+    libzip-dev libcurl4-openssl-dev pkg-config libssl-dev \
+    libjpeg-dev libfreetype6-dev
+
+RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-install pdo pdo_mysql mbstring zip exif pcntl gd
+RUN pecl install redis && docker-php-ext-enable redis
+
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+
+RUN useradd -G www-data,root -u 1000 -d /home/roman roman \
+    && mkdir -p /home/roman/.composer \
+    && chown -R roman:roman /home/roman
+
+WORKDIR /var/www
+
+# Install deps into the image layer; the named volume in compose
+# preserves vendor/ even when the bind-mount overrides /var/www
+COPY composer.json composer.lock ./
+RUN composer install --no-scripts
+
+RUN mkdir -p storage/framework/{cache,sessions,views} bootstrap/cache \
+    && chown -R roman:www-data /var/www \
+    && chmod -R 775 storage bootstrap/cache
+
+USER roman
+
+EXPOSE 9000
+CMD ["php-fpm"]
