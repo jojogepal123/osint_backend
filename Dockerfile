@@ -31,6 +31,13 @@ COPY . .
 # Install Laravel dependencies (optimized)
 RUN composer install --no-dev --optimize-autoloader
 
+# Ensure storage directories exist (git doesn't track empty dirs)
+RUN mkdir -p /var/www/storage/framework/cache/data \
+    && mkdir -p /var/www/storage/framework/sessions \
+    && mkdir -p /var/www/storage/framework/views \
+    && mkdir -p /var/www/storage/logs \
+    && mkdir -p /var/www/bootstrap/cache
+
 # Set permissions
 RUN chown -R roman:www-data /var/www \
     && chmod -R 775 /var/www/storage \

@@ -264,7 +264,8 @@ class ApiServiceController extends Controller
             $data['telData'] = null;
 
             try {
-                $telResponse = Http::timeout(120)
+                $telResponse = Http::withHeaders(['x-api-key' => env('FASTAPI_API_KEY')])
+                    ->timeout(120)
                     ->connectTimeout(5)
                     ->post($urls['telegram'], [
                         'phone' => '+' . $number,
@@ -386,7 +387,7 @@ class ApiServiceController extends Controller
                     'x-api-key' => env('X_API_KEY'),
                 ])->timeout(30)->get($urls['osint'], ['email' => $email, 'per_page' => 50]),
 
-                'zehefData' => fn($pool) => $pool->timeout(60)->post($urls['zehef'], ['email' => $email]),
+                'zehefData' => fn($pool) => $pool->withHeaders(['x-api-key' => env('FASTAPI_API_KEY')])->timeout(60)->post($urls['zehef'], ['email' => $email]),
                 // 'osEmailData' => fn($pool) => $pool->withHeaders([
                 //     'api-key' => env('OSINT_API_KEY'),
                 //     'accept' => 'application/json',
@@ -394,9 +395,9 @@ class ApiServiceController extends Controller
                 //             'query' => $email,
                 //             'timeout' => 60
                 //         ]),
-                'holeheData' => fn($pool) => $pool->timeout(30)->post($urls['holehe'], ['email' => $email]),
-                'socialScanData' => fn($pool) => $pool->timeout(30)->asJson()->post($urls['socialscan'], ['email' => $email]),
-                'emailData' => fn($pool) => $pool->timeout(30)->asJson()->post($urls['gmail'], ['email' => $email]),
+                'holeheData' => fn($pool) => $pool->withHeaders(['x-api-key' => env('FASTAPI_API_KEY')])->timeout(30)->post($urls['holehe'], ['email' => $email]),
+                'socialScanData' => fn($pool) => $pool->withHeaders(['x-api-key' => env('FASTAPI_API_KEY')])->timeout(30)->asJson()->post($urls['socialscan'], ['email' => $email]),
+                'emailData' => fn($pool) => $pool->withHeaders(['x-api-key' => env('FASTAPI_API_KEY')])->timeout(30)->asJson()->post($urls['gmail'], ['email' => $email]),
                 'getuserData' => fn($pool) => $pool->timeout(30)->get($urls['getuser']),
                 'hibpData' => fn($pool) => $pool->withHeaders([
                     'hibp-api-key' => env('HIBP_API_KEY'),
