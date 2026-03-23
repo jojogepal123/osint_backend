@@ -228,6 +228,18 @@ class ApiServiceController extends Controller
                                 'mobile_number' => $localNumber,
                             ]),
 
+                    'signalHireData' => fn($pool) => $pool->withHeaders([
+                        'X-API-Key' => env('FASTAPI_API_KEY'),
+                    ])->timeout(70)->asJson()->post(env('SIGNALHIRE_URL'), [
+                                'items' => ['+' . $number],
+                            ]),
+
+                    'telData' => fn($pool) => $pool->withHeaders([
+                        'x-api-key' => env('FASTAPI_API_KEY'),
+                    ])->timeout(120)->connectTimeout(5)->asJson()->post($urls['telegram'], [
+                                'phone' => '+' . $number,
+                            ]),
+
                 ];
                 $responses = Http::pool(fn($pool) => array_map(fn($req) => $req($pool), $requests));
             } catch (Exception $e) {
@@ -261,29 +273,6 @@ class ApiServiceController extends Controller
                 ]);
             }
 
-            $data['telData'] = null;
-
-            try {
-                $telResponse = Http::withHeaders(['x-api-key' => env('FASTAPI_API_KEY')])
-                    ->timeout(120)
-                    ->connectTimeout(5)
-                    ->post($urls['telegram'], [
-                        'phone' => '+' . $number,
-                    ]);
-
-                if ($telResponse->successful()) {
-                    $data['telData'] = $telResponse->json();
-                } else {
-                    Log::warning('[telData] API Failed', [
-                        'status' => $telResponse->status(),
-                        'body' => $telResponse->body(),
-                    ]);
-                }
-            } catch (Throwable $e) {
-                Log::error('[telData] API Exception', [
-                    'message' => $e->getMessage(),
-                ]);
-            }
 
             foreach (array_keys($requests) as $index => $key) {
                 $response = $responses[$index];
@@ -403,6 +392,7 @@ class ApiServiceController extends Controller
                     'hibp-api-key' => env('HIBP_API_KEY'),
                     'User-Agent' => 'LaravelApp/1.0',
                 ])->timeout(30)->get($urls['hibp'], ['truncateResponse' => 'false']),
+                'signalHireData' => fn($pool) => $pool->withHeaders(['X-API-Key' => env('FASTAPI_API_KEY')])->timeout(70)->asJson()->post(env('SIGNALHIRE_URL'), ['items' => [$email]]),
             ];
 
             $responses = Http::pool(fn($pool) => array_map(fn($req) => $req($pool), $requests));
