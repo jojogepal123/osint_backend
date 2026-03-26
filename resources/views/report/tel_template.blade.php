@@ -214,6 +214,65 @@
         @endif
     @endforeach
 
+    {{-- SignalHire Professional Data --}}
+    @foreach([
+    'telBio' => 'Bio',
+    'jobProfiles' => 'Job Profiles',
+    'shExperience' => 'Experience',
+    'shEducation' => 'Education',
+    'shSkills' => 'Skills',
+    'shCertifications' => 'Certifications',
+    'shOrganizations' => 'Organizations',
+    'shHonorAwards' => 'Awards & Honors',
+] as $field => $label)
+        @if(!empty($profile[$field]))
+            <div class="section">
+                <h2>{{ $label }}</h2>
+                <table class="info-table">
+                    @foreach($profile[$field] as $item)
+                        <tr>
+                            @if(!empty($item['key']))
+                                <th>{{ $item['key'] }}</th>
+                            @else
+                                <th>{{ $label }}</th>
+                            @endif
+                            <td>
+                                {{ is_array($item['value'] ?? '') ? json_encode($item['value']) : ($item['value'] ?? 'N/A') }}
+                                @if(!empty($item['source']))
+                                    <span class="source-label">(Source: {{ $item['source'] }})</span>
+                                @endif
+                            </td>
+                        </tr>
+                    @endforeach
+                </table>
+            </div>
+        @endif
+    @endforeach
+
+    {{-- Social Profiles --}}
+    @if(!empty($profile['shSocialLinks']))
+        <div class="section">
+            <h2>Social Profiles</h2>
+            <table class="info-table">
+                @foreach($profile['shSocialLinks'] as $link)
+                    <tr>
+                        <th>{{ $link['key'] ?? 'Profile' }}</th>
+                        <td>
+                            @if(!empty($link['url']))
+                                <a href="{{ $link['url'] }}" target="_blank">{{ $link['value'] ?? $link['url'] }}</a>
+                            @else
+                                {{ $link['value'] ?? 'N/A' }}
+                            @endif
+                            @if(!empty($link['source']))
+                                <span class="source-label">(Source: {{ $link['source'] }})</span>
+                            @endif
+                        </td>
+                    </tr>
+                @endforeach
+            </table>
+        </div>
+    @endif
+
     {{-- Boolean Fields --}}
     @foreach([
     'numberIsActivate' => 'Number Is Activate',
