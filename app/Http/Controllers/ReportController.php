@@ -178,32 +178,29 @@ class ReportController extends Controller
         EOT;
 
 
-        // Step 3: Call VPS AI API
-        $response = Http::timeout(60)
-            ->retry(3, 500)
-            ->withHeaders([
-                'x-api-key' => env('AI_API_KEY'),
-                'Content-Type' => 'application/json',
-            ])
-            ->post('https://intelltraceai.tech/v1/generate', [
-                'prompt' => $prompt,
-            ]);
+        // Step 3: Call Gemini API
+        $response = Http::timeout(20)
+            ->retry(3, 200)
+            ->post(
+                'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' . env('GEMINI_API_KEY'),
+                [
+                    'contents' => [
+                        [
+                            'parts' => [['text' => $prompt]]
+                        ]
+                    ]
+                ]
+            );
 
         if (!$response->successful()) {
-            Log::error("VPS AI request failed", [
+            Log::error("Gemini AI request failed", [
                 'status' => $response->status(),
                 'body' => $response->body(),
             ]);
-            return response()->json(['error' => 'AI failed to generate report.'], 500);
+            return response()->json(['error' => 'Gemini AI failed to generate report.'], 500);
         }
 
-        $responseJson = $response->json();
-        $rawText = $responseJson['response']
-            ?? $responseJson['text']
-            ?? $responseJson['content']
-            ?? $responseJson['output']
-            ?? $response->body()
-            ?? '{}';
+        $rawText = $response['candidates'][0]['content']['parts'][0]['text'] ?? '{}';
 
         // Clean out markdown backticks (```json ... ```)
         $cleanJson = trim($rawText);
