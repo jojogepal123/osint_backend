@@ -444,7 +444,7 @@ class ApiServiceController extends Controller
                 }
             }
 
-            Log::info($data);
+            // Log::info($data);
 
             return response()->json([
                 'data' => $data,
@@ -701,9 +701,15 @@ class ApiServiceController extends Controller
                     'credits' => $user->credits,
                 ]);
             } else {
+                Log::error('Leak Data Finder: FastAPI bad response', [
+                    'status' => $response->status(),
+                    'body'   => $response->body(),
+                    'url'    => env('OSINTDATA_URL'),
+                    'params' => $params,
+                ]);
                 return response()->json(['error' => 'Failed to fetch data from API'], 500);
             }
-        } catch (Exception $e) {
+        } catch (\Throwable $e) {
             Log::error('Leak Data Finder Error', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
