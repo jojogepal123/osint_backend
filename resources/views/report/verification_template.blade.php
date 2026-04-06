@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Challan Report</title>
+  <title>Verification Report</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: DejaVu Sans, sans-serif; font-size: 12px; color: #1a1a2e; background: #fff; }
@@ -22,35 +22,43 @@
     .subject-label { font-size: 9px; color: #888; text-transform: uppercase; letter-spacing: 1px; }
     .subject-value { font-size: 16px; font-weight: bold; color: #0f3460; margin-top: 2px; }
 
+    .verified-badge {
+      display: inline-block;
+      background: #1a7a1a;
+      color: #fff;
+      font-size: 9px;
+      font-weight: bold;
+      padding: 2px 8px;
+      border-radius: 3px;
+      letter-spacing: 1px;
+      margin-top: 6px;
+    }
+
     .section { margin: 0 24px 18px; }
     .section-title {
       font-size: 10px; font-weight: bold; text-transform: uppercase;
       letter-spacing: 1.5px; color: #0f3460;
-      border-bottom: 2px solid #a8ff78; padding-bottom: 4px; margin-bottom: 10px;
+      border-bottom: 2px solid #a8ff78; padding-bottom: 4px; margin-bottom: 8px;
     }
 
-    /* challan card */
-    .challan-card {
-      border: 1px solid #d0dce8;
-      border-radius: 4px;
-      margin-bottom: 14px;
-      overflow: hidden;
-    }
-    .challan-card-head {
-      background: #0f3460;
-      color: #a8ff78;
-      font-weight: bold;
-      font-size: 11px;
-      padding: 7px 12px;
-    }
     table { width: 100%; border-collapse: collapse; }
     tr:nth-child(odd)  td { background: #f8faff; }
     tr:nth-child(even) td { background: #fff; }
-    td { padding: 6px 12px; border-bottom: 1px solid #e8eaf0; vertical-align: top; }
-    .td-key { width: 42%; font-weight: bold; color: #0f3460; font-size: 11px; }
+    td { padding: 7px 12px; border-bottom: 1px solid #e8eaf0; vertical-align: top; }
+    .td-key { width: 40%; font-weight: bold; color: #0f3460; font-size: 11px; }
     .td-val { color: #333; font-size: 11px; }
+    .badge-yes { color: #1a7a1a; font-weight: bold; }
+    .badge-no  { color: #c0392b; font-weight: bold; }
 
-    .no-data { color: #c0392b; font-style: italic; padding: 10px 0; }
+    .nested-head {
+      background: #e8f0fe;
+      font-weight: bold;
+      font-size: 10px;
+      color: #0f3460;
+      padding: 5px 12px;
+      border-bottom: 1px solid #d0dce8;
+    }
+    .nested-key { padding-left: 24px; color: #555; font-size: 10px; }
 
     .footer { margin-top: 24px; padding: 12px 24px; background: #0f3460; color: #b0c4de; font-size: 9px; }
     .footer-table { display: table; width: 100%; }
@@ -68,7 +76,7 @@
         <div class="app-tagline">INTELLIGENCE PLATFORM</div>
       </div>
       <div class="header-meta">
-        <div class="report-type">RC Challan Details Report</div>
+        <div class="report-type">{{ $title ?? 'Verification' }} Report</div>
         <div class="report-date">Generated: {{ now()->format('d M Y, H:i') }}</div>
       </div>
     </div>
@@ -76,46 +84,50 @@
   <div class="accent-bar"></div>
 
   <div class="subject">
-    <div class="subject-label">Vehicle Registration Number</div>
-    <div class="subject-value">{{ strtoupper($data['rc_number'] ?? 'N/A') }}</div>
+    <div class="subject-label">Search Query</div>
+    <div class="subject-value">{{ strtoupper($searchInput ?? 'N/A') }}</div>
+    <div class="verified-badge">&#10003; VERIFIED</div>
   </div>
 
   <div class="section">
-    <div class="section-title">Challan Records</div>
-
-    @if (!empty($data['challan_details']) && is_array($data['challan_details']))
-      @foreach ($data['challan_details'] as $index => $challan)
-        <div class="challan-card">
-          <div class="challan-card-head">Challan #{{ $index + 1 }}
-            @if (!empty($challan['challan_number'])) &nbsp;&mdash;&nbsp; {{ $challan['challan_number'] }} @endif
-          </div>
-          <table>
-            @foreach ($challan as $key => $value)
-              @if (!is_array($value) && !is_null($value) && $value !== '' && strtolower((string)$value) !== 'n/a')
-                <tr>
-                  <td class="td-key">{{ ucwords(str_replace('_', ' ', $key)) }}</td>
-                  <td class="td-val">{{ $value }}</td>
-                </tr>
+    <div class="section-title">Verification Details</div>
+    <table>
+      {{-- Scalar fields first --}}
+      @foreach ($data as $key => $value)
+        @if (!is_array($value) && !is_null($value) && $value !== '' && strtolower((string)$value) !== 'n/a')
+          <tr>
+            <td class="td-key">{{ ucwords(str_replace('_', ' ', $key)) }}</td>
+            <td class="td-val">
+              @php $v = strtolower((string)$value); @endphp
+              @if ($v === 'true' || $v === '1' || $v === 'yes')
+                <span class="badge-yes">&#10003; Yes</span>
+              @elseif ($v === 'false' || $v === '0' || $v === 'no')
+                <span class="badge-no">&#10007; No</span>
+              @else
+                {{ $value }}
               @endif
-              @if (is_array($value) && count($value) > 0)
-                @foreach ($value as $subKey => $subVal)
-                  @if (!is_array($subVal) && !is_null($subVal) && $subVal !== '')
-                    <tr>
-                      <td class="td-key" style="padding-left:20px; color:#555;">
-                        &rsaquo; {{ ucwords(str_replace('_', ' ', $subKey)) }}
-                      </td>
-                      <td class="td-val">{{ $subVal }}</td>
-                    </tr>
-                  @endif
-                @endforeach
-              @endif
-            @endforeach
-          </table>
-        </div>
+            </td>
+          </tr>
+        @endif
       @endforeach
-    @else
-      <p class="no-data">No challan records found for this vehicle.</p>
-    @endif
+
+      {{-- Nested arrays --}}
+      @foreach ($data as $key => $value)
+        @if (is_array($value) && count($value) > 0)
+          <tr>
+            <td colspan="2" class="nested-head">{{ ucwords(str_replace('_', ' ', $key)) }}</td>
+          </tr>
+          @foreach ($value as $subKey => $subVal)
+            @if (!is_array($subVal) && !is_null($subVal) && $subVal !== '')
+              <tr>
+                <td class="td-key nested-key">&rsaquo; {{ ucwords(str_replace('_', ' ', $subKey)) }}</td>
+                <td class="td-val">{{ $subVal }}</td>
+              </tr>
+            @endif
+          @endforeach
+        @endif
+      @endforeach
+    </table>
   </div>
 
   <div class="footer">

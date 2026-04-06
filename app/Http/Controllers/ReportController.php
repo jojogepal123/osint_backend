@@ -260,6 +260,8 @@ class ReportController extends Controller
                 return false;
             if (is_null($value) || $value === '')
                 return false;
+            if (!is_scalar($value))
+                return true;
             $v = strtolower(trim((string) $value));
             return !in_array($v, ['n/a', 'na', 'n.a']);
         }, ARRAY_FILTER_USE_BOTH);
@@ -293,6 +295,8 @@ class ReportController extends Controller
                 return false;
             if (is_null($value) || $value === '')
                 return false;
+            if (!is_scalar($value))
+                return true; // keep arrays/objects as-is
             $v = strtolower(trim((string) $value));
             return !in_array($v, ['n/a', 'na', 'n.a']);
         }, ARRAY_FILTER_USE_BOTH);
@@ -350,6 +354,84 @@ class ReportController extends Controller
             return response()->download($filePath, $filename);
         } catch (Exception $e) {
             Log::error("Challan PDF generation error: " . $e->getMessage());
+            return response()->json(['error' => 'PDF generation failed'], 500);
+        }
+    }
+
+    public function generateVerificationReport(Request $request)
+    {
+        $validated = $request->validate([
+            'data'        => ['required', 'array'],
+            'title'       => ['sometimes', 'string'],
+            'searchInput' => ['sometimes', 'string'],
+        ]);
+
+        $userEmail   = Auth::check() ? Auth::user()->email : 'N/A';
+        $title       = $validated['title']       ?? 'Verification';
+        $searchInput = $validated['searchInput'] ?? '';
+
+        $data = array_filter($validated['data'], function ($value, $key) {
+            if (in_array(strtolower($key), ['client_id', 'clientid', 'verification_id']))
+                return false;
+            if (is_null($value) || $value === '')
+                return false;
+            if (is_scalar($value)) {
+                $v = strtolower(trim((string) $value));
+                return !in_array($v, ['n/a', 'na', 'n.a']);
+            }
+            return true;
+        }, ARRAY_FILTER_USE_BOTH);
+
+        $filename = 'verification_' . now()->format('Ymd_His') . '_' . Str::uuid() . '.pdf';
+        $filePath = storage_path("app/private/reports/{$filename}");
+        Storage::makeDirectory('private/reports');
+
+        try {
+            $html = View::make('report.verification_template', [
+                'data'        => $data,
+                'title'       => $title,
+                'searchInput' => $searchInput,
+                'userEmail'   => $userEmail,
+            ])->render();
+            Pdf::loadHTML($html)->save($filePath);
+            return response()->download($filePath, $filename);
+        } catch (Exception $e) {
+            Log::error("Verification PDF generation error: " . $e->getMessage());
+            return response()->json(['error' => 'PDF generation failed'], 500);
+        }
+    }
+
+    public function generateSocialReport(Request $request)
+    {
+        $validated = $request->validate([
+            'data' => ['required', 'array'],
+        ]);
+
+        $userEmail = Auth::check() ? Auth::user()->email : 'N/A';
+        $data = $validated['data'];
+
+        // Convert photo URL to base64
+        $photoUrl = data_get($data, 'photo.url') ?? ($data['photoUrl'] ?? null);
+        if ($photoUrl) {
+            $base64 = $this->getImageBase64($photoUrl);
+            if ($base64) {
+                $data['_photoBase64'] = $base64;
+            }
+        }
+
+        $filename = 'social_intel_' . Str::slug($data['fullName'] ?? 'profile') . '_' . now()->format('Ymd_His') . '.pdf';
+        $filePath = storage_path("app/private/reports/{$filename}");
+        Storage::makeDirectory('private/reports');
+
+        try {
+            $html = View::make('report.social_template', [
+                'data'      => $data,
+                'userEmail' => $userEmail,
+            ])->render();
+            Pdf::loadHTML($html)->save($filePath);
+            return response()->download($filePath, $filename);
+        } catch (Exception $e) {
+            Log::error("Social Intel PDF error: " . $e->getMessage());
             return response()->json(['error' => 'PDF generation failed'], 500);
         }
     }

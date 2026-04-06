@@ -49,11 +49,14 @@ Route::middleware(['auth:sanctum', 'token.expire', 'throttle:30,1'])->group(func
     Route::post('/leak-data-finder', [ApiServiceController::class, 'leakDataFinder']);
     Route::post('/corporate-intelligence', [ApiServiceController::class, 'corporateData']);
     Route::post('/verification-id', [ApiServiceController::class, 'verificationIdData']);
+    Route::post('/social-intel-search', [ApiServiceController::class, 'socialIntelSearch']);
     Route::post('/generate-report', [ReportController::class, 'generateReport']);
     Route::post('/generate-ai-report', [ReportController::class, 'generateAiReport']);
     Route::post('/generate-rc-report', [ReportController::class, 'generateRcReport']);
     Route::post('/generate-upi-report', [ReportController::class, 'generateUpiReport']);
     Route::post('/generate-challan-report', [ReportController::class, 'generateChallanReport']);
+    Route::post('/generate-verification-report', [ReportController::class, 'generateVerificationReport']);
+    Route::post('/generate-social-report', [ReportController::class, 'generateSocialReport']);
 
     // Route::get('/download-report/{filename}', [ReportController::class, 'downloadReport']);
 });

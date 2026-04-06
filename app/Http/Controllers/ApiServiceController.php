@@ -1469,4 +1469,70 @@ class ApiServiceController extends Controller
 
         return $this->handleResponse($response); // fallback for non-200 responses
     }
+
+    public function socialIntelSearch(Request $request)
+    {
+        $request->validate([
+            'type' => ['required', 'string', 'in:linkedin,phone,email'],
+            'value' => ['required', 'string', 'max:255'],
+        ]);
+
+        $user = auth()->user();
+        $type = $request->input('type');
+        $value = trim($request->input('value'));
+
+        // Normalise phone: ensure leading +
+        if ($type === 'phone') {
+            $value = $this->sanitizePhoneNumber($value);
+            if (!str_starts_with($value, '+')) {
+                $value = '+' . $value;
+            }
+        }
+
+        SearchQuery::create([
+            'user_id' => $user->id,
+            'query' => $value,
+            'ip_address' => $request->ip(),
+        ]);
+
+        try {
+            $response = Http::withHeaders([
+                'X-API-Key' => env('FASTAPI_API_KEY'),
+            ])->timeout(70)->asJson()->post(env('SIGNALHIRE_URL'), [
+                        'items' => [$value],
+                    ]);
+
+            if (!$response->successful()) {
+                Log::warning('socialIntelSearch FastAPI error', [
+                    'status' => $response->status(),
+                    'body' => $response->body(),
+                ]);
+                return response()->json([
+                    'error' => 'Search failed. Please try again.',
+                ], $response->status());
+            }
+
+            $json = $response->json();
+
+            // Deduct credits on success
+            $deduction = (int) env('SOCIAL_INTEL_COST', env('SOCIAL_INTEL_COST', 1));
+            if ($user->credits >= $deduction) {
+                $user->credits -= $deduction;
+                $user->save();
+            } else {
+                return response()->json([
+                    'message' => 'Insufficient credits.',
+                    'credits' => $user->credits,
+                ], 402);
+            }
+
+            return response()->json([
+                ...$json,
+                'credits' => $user->credits,
+            ]);
+        } catch (Exception $e) {
+            Log::error('socialIntelSearch exception', ['message' => $e->getMessage()]);
+            return response()->json(['error' => 'Something went wrong. Please try again.'], 500);
+        }
+    }
 }
