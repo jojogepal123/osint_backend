@@ -8,6 +8,7 @@ use App\Http\Controllers\Auth\VerifyEmailController;
 use App\Http\Controllers\GoogleAuthController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ReportController;
+use App\Http\Controllers\AdminController;
 
 
 Route::post('/register', [AuthController::class, 'register']);
@@ -61,6 +62,18 @@ Route::middleware(['auth:sanctum', 'token.expire', 'throttle:30,1'])->group(func
     // Route::get('/download-report/{filename}', [ReportController::class, 'downloadReport']);
 });
 
+
+// ADMIN ROUTES
+Route::middleware(['auth:sanctum', 'token.expire', 'admin'])->prefix('admin')->group(function () {
+    Route::get('/stats',                    [AdminController::class, 'stats']);
+    Route::get('/users',                    [AdminController::class, 'users']);
+    Route::post('/users',                   [AdminController::class, 'createUser']);
+    Route::get('/users/{id}',               [AdminController::class, 'user']);
+    Route::put('/users/{id}',               [AdminController::class, 'updateUser']);
+    Route::delete('/users/{id}',            [AdminController::class, 'deleteUser']);
+    Route::get('/queries',                  [AdminController::class, 'queries']);
+    Route::get('/users/{id}/queries',       [AdminController::class, 'userQueries']);
+});
 
 Route::get('/registration-status', function () {
     return response()->json([

@@ -24,6 +24,7 @@ class User extends Authenticatable
         'password',
         'app_mode',
         'credits',
+        'is_admin',
         'otp',
         'otp_expires_at',
     ];
@@ -49,7 +50,8 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'otp_expires_at' => 'datetime',
-            'last_otp_verified_at' => 'datetime'
+            'last_otp_verified_at' => 'datetime',
+            'is_admin' => 'boolean',
         ];
     }
 

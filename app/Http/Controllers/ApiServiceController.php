@@ -97,6 +97,7 @@ class ApiServiceController extends Controller
             SearchQuery::create([
                 'user_id' => $user->id,
                 'query' => $number,
+                'type' => 'phone',
                 'ip_address' => $request->ip(),
             ]);
             try {
@@ -354,6 +355,7 @@ class ApiServiceController extends Controller
             SearchQuery::create([
                 'user_id' => $user->id,
                 'query' => $email,
+                'type' => 'email',
                 'ip_address' => $request->ip(),
             ]);
 
@@ -470,6 +472,7 @@ class ApiServiceController extends Controller
         SearchQuery::create([
             'user_id' => $user->id,
             'query' => $upiId,
+            'type' => 'upi',
             'ip_address' => $request->ip(),
         ]);
         try {
@@ -529,6 +532,7 @@ class ApiServiceController extends Controller
         SearchQuery::create([
             'user_id' => $user->id,
             'query' => $idNumber,
+            'type' => 'vehicle',
             'ip_address' => $request->ip(),
         ]);
 
@@ -590,6 +594,7 @@ class ApiServiceController extends Controller
         SearchQuery::create([
             'user_id' => $user->id,
             'query' => $rcNumber,
+            'type' => 'challan',
             'ip_address' => $request->ip(),
         ]);
 
@@ -649,6 +654,7 @@ class ApiServiceController extends Controller
         SearchQuery::create([
             'user_id' => $user->id,
             'query' => json_encode($data),
+            'type' => 'leak',
             'ip_address' => $request->ip(),
         ]);
 
@@ -724,6 +730,7 @@ class ApiServiceController extends Controller
         SearchQuery::create([
             'user_id' => $user->id,
             'query' => json_encode($data),
+            'type' => 'corporate',
             'ip_address' => $request->ip(),
         ]);
 
@@ -1030,6 +1037,7 @@ class ApiServiceController extends Controller
         SearchQuery::create([
             'user_id' => $user->id,
             'query' => json_encode($data),
+            'type' => 'verification',
             'ip_address' => $request->ip(),
         ]);
         if (!$type || !$data) {
@@ -1492,6 +1500,7 @@ class ApiServiceController extends Controller
         SearchQuery::create([
             'user_id' => $user->id,
             'query' => $value,
+            'type' => 'social',
             'ip_address' => $request->ip(),
         ]);
 

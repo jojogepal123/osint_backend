@@ -8,6 +8,7 @@ class SearchQuery extends Model
 {
     protected $fillable = [
         'query',
+        'type',
         'user_id',
         'ip_address',
     ];

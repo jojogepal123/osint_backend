@@ -17,8 +17,9 @@ return Application::configure(basePath: dirname(__DIR__))
         // ]);
     
         $middleware->alias([
-            'verified' => \App\Http\Middleware\EnsureEmailIsVerified::class,
+            'verified'     => \App\Http\Middleware\EnsureEmailIsVerified::class,
             'token.expire' => App\Http\Middleware\ExpireSanctumToken::class,
+            'admin'        => App\Http\Middleware\IsAdmin::class,
         ]);
 
         //
