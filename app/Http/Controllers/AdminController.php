@@ -5,10 +5,26 @@ namespace App\Http\Controllers;
 use App\Models\User;
 use App\Models\SearchQuery;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\Rules\Password;
 
 class AdminController extends Controller
 {
+    // Valid search query types whitelist
+    private const VALID_TYPES = ['phone', 'email', 'vehicle', 'challan', 'corporate', 'social', 'verification', 'leak', 'upi'];
+
+    // Fields returned in user listings (never expose otp, password, remember_token)
+    private const USER_FIELDS = ['id', 'name', 'email', 'app_mode', 'credits', 'is_admin', 'email_verified_at', 'created_at', 'updated_at'];
+
+    private function auditLog(string $action, array $context = []): void
+    {
+        Log::channel('stack')->info("[ADMIN AUDIT] {$action}", array_merge([
+            'admin_id'    => auth()->id(),
+            'admin_email' => auth()->user()?->email,
+            'ip'          => request()->ip(),
+        ], $context));
+    }
+
     // ── Stats Overview ──────────────────────────────────────────────────────
     public function stats()
     {
@@ -26,8 +42,14 @@ class AdminController extends Controller
     // ── Users List ──────────────────────────────────────────────────────────
     public function users(Request $request)
     {
-        $query = User::withCount('searchQueries')
-            ->with('ips');
+        $request->validate([
+            'search'   => 'sometimes|string|max:100',
+            'app_mode' => 'sometimes|in:trial,live',
+            'page'     => 'sometimes|integer|min:1|max:1000',
+        ]);
+
+        $query = User::select(self::USER_FIELDS)
+            ->withCount('searchQueries');
 
         if ($search = $request->query('search')) {
             $query->where(function ($q) use ($search) {
@@ -40,19 +62,20 @@ class AdminController extends Controller
             $query->where('app_mode', $mode);
         }
 
-        $users = $query->latest()->paginate(15);
-
-        return response()->json($users);
+        return response()->json($query->latest()->paginate(15));
     }
 
     // ── Single User ─────────────────────────────────────────────────────────
     public function user($id)
     {
-        $user = User::withCount('searchQueries')
-            ->with('ips')
-            ->findOrFail($id);
+        abort_unless(is_numeric($id), 400, 'Invalid user ID.');
 
-        $queriesByType = SearchQuery::where('user_id', $id)
+        $user = User::select(self::USER_FIELDS)
+            ->withCount('searchQueries')
+            ->with(['ips:id,user_id,ip,created_at'])
+            ->findOrFail((int) $id);
+
+        $queriesByType = SearchQuery::where('user_id', (int) $id)
             ->selectRaw('type, count(*) as count')
             ->groupBy('type')
             ->pluck('count', 'type');
@@ -67,50 +90,78 @@ class AdminController extends Controller
     public function createUser(Request $request)
     {
         $validated = $request->validate([
-            'name'     => 'required|string|max:255',
-            'email'    => 'required|email|unique:users,email',
-            'password' => 'required|string|min:8',
-            'credits'  => 'sometimes|numeric|min:0',
+            'name'     => 'required|string|max:255|regex:/^[\pL\s\-]+$/u',
+            'email'    => 'required|email:rfc,dns|max:255|unique:users,email',
+            'password' => ['required', 'string', Password::min(8)->mixedCase()->numbers()],
+            'credits'  => 'sometimes|numeric|min:0|max:999999',
             'app_mode' => 'sometimes|in:trial,live',
             'is_admin' => 'sometimes|boolean',
         ]);
 
-        $validated['password']        = bcrypt($validated['password']);
-        $validated['email_verified_at'] = now();
-        $validated['credits']         = $validated['credits'] ?? 0;
-        $validated['app_mode']        = $validated['app_mode'] ?? 'trial';
+        $user = User::create([
+            'name'               => $validated['name'],
+            'email'              => $validated['email'],
+            'password'           => bcrypt($validated['password']),
+            'email_verified_at'  => now(),
+            'credits'            => $validated['credits'] ?? 0,
+            'app_mode'           => $validated['app_mode'] ?? 'live',
+            'is_admin'           => $validated['is_admin'] ?? false,
+        ]);
 
-        $user = User::create($validated);
+        $this->auditLog('USER_CREATED', ['target_id' => $user->id, 'target_email' => $user->email]);
 
-        return response()->json(['message' => 'User created.', 'user' => $user], 201);
+        return response()->json(['message' => 'User created.', 'user' => $user->only(self::USER_FIELDS)], 201);
     }
 
     // ── Update User ─────────────────────────────────────────────────────────
     public function updateUser(Request $request, $id)
     {
-        $user = User::findOrFail($id);
+        abort_unless(is_numeric($id), 400, 'Invalid user ID.');
+
+        $user = User::findOrFail((int) $id);
 
         $validated = $request->validate([
             'name'     => 'sometimes|string|max:255',
-            'credits'  => 'sometimes|numeric|min:0',
+            'credits'  => 'sometimes|numeric|min:0|max:999999',
             'app_mode' => 'sometimes|in:trial,live',
             'is_admin' => 'sometimes|boolean',
         ]);
 
+        // Prevent admin from revoking their own admin access
+        if (isset($validated['is_admin']) && !$validated['is_admin'] && $user->id === auth()->id()) {
+            return response()->json(['error' => 'You cannot revoke your own admin access.'], 422);
+        }
+
+        $before = $user->only(array_keys($validated));
         $user->update($validated);
 
-        return response()->json(['message' => 'User updated.', 'user' => $user]);
+        $this->auditLog('USER_UPDATED', [
+            'target_id'    => $user->id,
+            'target_email' => $user->email,
+            'before'       => $before,
+            'after'        => $validated,
+        ]);
+
+        return response()->json(['message' => 'User updated.', 'user' => $user->only(self::USER_FIELDS)]);
     }
 
     // ── Delete User ─────────────────────────────────────────────────────────
     public function deleteUser($id)
     {
-        $user = User::findOrFail($id);
+        abort_unless(is_numeric($id), 400, 'Invalid user ID.');
 
-        // Prevent deleting yourself
+        $user = User::findOrFail((int) $id);
+
         if ($user->id === auth()->id()) {
             return response()->json(['error' => 'You cannot delete your own account.'], 422);
         }
+
+        // Prevent deleting other admins
+        if ($user->is_admin) {
+            return response()->json(['error' => 'Cannot delete another admin account.'], 422);
+        }
+
+        $this->auditLog('USER_DELETED', ['target_id' => $user->id, 'target_email' => $user->email]);
 
         $user->delete();
 
@@ -120,30 +171,44 @@ class AdminController extends Controller
     // ── Search Queries List ─────────────────────────────────────────────────
     public function queries(Request $request)
     {
-        $query = SearchQuery::with('user:id,name,email')
-            ->latest();
+        $request->validate([
+            'search'  => 'sometimes|string|max:100',
+            'type'    => 'sometimes|in:' . implode(',', self::VALID_TYPES),
+            'user_id' => 'sometimes|integer|min:1',
+            'page'    => 'sometimes|integer|min:1|max:1000',
+        ]);
+
+        $query = SearchQuery::with('user:id,name,email')->latest();
 
         if ($search = $request->query('search')) {
             $query->where('query', 'like', "%{$search}%");
         }
 
         if ($type = $request->query('type')) {
-            $query->where('type', $type);
+            $query->where('type', $type); // already whitelisted above
         }
 
         if ($userId = $request->query('user_id')) {
-            $query->where('user_id', $userId);
+            $query->where('user_id', (int) $userId);
         }
 
-        $queries = $query->paginate(20);
-
-        return response()->json($queries);
+        return response()->json($query->paginate(20));
     }
 
     // ── User's Search Queries ───────────────────────────────────────────────
     public function userQueries(Request $request, $id)
     {
-        $query = SearchQuery::where('user_id', $id)
+        abort_unless(is_numeric($id), 400, 'Invalid user ID.');
+
+        $request->validate([
+            'type' => 'sometimes|in:' . implode(',', self::VALID_TYPES),
+            'page' => 'sometimes|integer|min:1|max:1000',
+        ]);
+
+        // Ensure user exists
+        User::findOrFail((int) $id);
+
+        $query = SearchQuery::where('user_id', (int) $id)
             ->with('user:id,name,email')
             ->latest();
 
@@ -151,8 +216,6 @@ class AdminController extends Controller
             $query->where('type', $type);
         }
 
-        $queries = $query->paginate(20);
-
-        return response()->json($queries);
+        return response()->json($query->paginate(20));
     }
 }

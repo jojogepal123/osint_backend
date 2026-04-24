@@ -14,8 +14,8 @@ use App\Http\Controllers\AdminController;
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
 
-Route::post('/resend-otp', [AuthController::class, 'resendOtp']);
-Route::post('/verify-email-otp', [AuthController::class, 'verifyOtp']);
+Route::post('/resend-otp', [AuthController::class, 'resendOtp'])->middleware('throttle:5,1');
+Route::post('/verify-email-otp', [AuthController::class, 'verifyOtp'])->middleware('throttle:5,1');
 
 
 Route::middleware(['auth'])->group(function () {
@@ -64,7 +64,7 @@ Route::middleware(['auth:sanctum', 'token.expire', 'throttle:30,1'])->group(func
 
 
 // ADMIN ROUTES
-Route::middleware(['auth:sanctum', 'token.expire', 'admin'])->prefix('admin')->group(function () {
+Route::middleware(['auth:sanctum', 'token.expire', 'admin', 'throttle:60,1'])->prefix('admin')->group(function () {
     Route::get('/stats',                    [AdminController::class, 'stats']);
     Route::get('/users',                    [AdminController::class, 'users']);
     Route::post('/users',                   [AdminController::class, 'createUser']);
