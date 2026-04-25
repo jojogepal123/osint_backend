@@ -703,8 +703,8 @@ class ApiServiceController extends Controller
             } else {
                 Log::error('Leak Data Finder: FastAPI bad response', [
                     'status' => $response->status(),
-                    'body'   => $response->body(),
-                    'url'    => env('OSINTDATA_URL'),
+                    'body' => $response->body(),
+                    'url' => env('OSINTDATA_URL'),
                     'params' => $params,
                 ]);
                 return response()->json(['error' => 'Failed to fetch data from API'], 500);
@@ -748,6 +748,12 @@ class ApiServiceController extends Controller
                 return $this->handleFindUan($data);
             case 'pan_to_uan':
                 return $this->handlePanToUan($data);
+            case 'pan_to_gstin':
+                return $this->handlePanToGstKybVerification($data);
+            case 'gstin_kyb':
+                return $this->handleGstinKybVerification($data);
+            case 'pan_to_udyam':
+                return $this->handlePanToUdyamKybVerification($data);
             default:
                 return response()->json(['error' => 'Invalid search request'], 400);
         }
@@ -1072,7 +1078,7 @@ class ApiServiceController extends Controller
             $timestamp = time();
             $data = $clientId . '.' . $timestamp;
 
-            $publicKeyPath = storage_path('app/cashfree_public_key.pem');
+            $publicKeyPath = env('CASHFREE_PUBLIC_KEY_PATH');
 
             if (!file_exists($publicKeyPath)) {
                 Log::error('Public key file not found');
@@ -1196,6 +1202,102 @@ class ApiServiceController extends Controller
         return $this->handleResponse($response); // fallback
     }
 
+
+    private function handlePanToUdyamKybVerification($data)
+    {
+        $pankyb = strtoupper(trim($data['pan'] ?? ''));
+        if (!preg_match('/^[A-Z]{5}[0-9]{4}[A-Z]$/', $pankyb)) {
+            Log::error('Invalid PAN format', ['pan' => $pankyb]);
+            return response()->json(['error' => 'Invalid PAN number format'], 400);
+        }
+        $payload = [
+            'pankyb' => $pankyb,
+            'verification_id' => 'PAN360_' . uniqid() . '_' . time(),
+        ];
+        try {
+            $response = Http::withHeaders($this->getHeaders())
+                ->timeout(30)
+                ->post(env('PAN_TO_GST_URL'), $payload);
+
+
+            return $this->deductUserVerifyCredits($response, env('PAN_VERIFY_COST'));
+            // return $this->handleResponse($response);
+        } catch (Exception $e) {
+            Log::error('PAN TO GSTIN verification exception', [
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            return $this->handleVerificationException($e);
+        }
+    }
+
+    private function handleGstinKybVerification($data)
+    {
+        $gstin = strtoupper(trim($data['GSTIN'] ?? ''));
+        $businessName = $data['business_name'] ?? null;
+
+        // ✅ Validate GSTIN format
+        if (empty($gstin) || !preg_match('/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/', $gstin)) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Invalid GSTIN format'
+            ], 400);
+        }
+
+        // ✅ Payload
+        $payload = [
+            'GSTIN' => $gstin,
+            'verification_id' => 'GST_' . uniqid() . '_' . time(), // optional but recommended
+        ];
+
+        if (!empty($businessName)) {
+            $payload['business_name'] = $businessName;
+        }
+
+        try {
+            $response = Http::withHeaders($this->getHeaders()) // 🔥 using your signature system
+                ->timeout(30)
+                ->post(env('GSTIN_VERIFICATION_URL'), $payload);
+
+            return $this->deductUserVerifyCredits($response, env('GSTIN_VERIFY_COST'));
+
+        } catch (Exception $e) {
+            Log::error('GSTIN verification error: ' . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Server error occurred',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+    private function handlePanToGstKybVerification($data)
+    {
+        $pankyb = strtoupper(trim($data['pan'] ?? ''));
+        if (!preg_match('/^[A-Z]{5}[0-9]{4}[A-Z]$/', $pankyb)) {
+            Log::error('Invalid PAN format', ['pan' => $pankyb]);
+            return response()->json(['error' => 'Invalid PAN number format'], 400);
+        }
+        $payload = [
+            'pankyb' => $pankyb,
+            'verification_id' => 'PAN360_' . uniqid() . '_' . time(),
+        ];
+        try {
+            $response = Http::withHeaders($this->getHeaders())
+                ->timeout(30)
+                ->post(env('PAN_TO_GST_URL'), $payload);
+
+
+            return $this->deductUserVerifyCredits($response, env('PAN_VERIFY_COST'));
+            // return $this->handleResponse($response);
+        } catch (Exception $e) {
+            Log::error('PAN TO GSTIN verification exception', [
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            return $this->handleVerificationException($e);
+        }
+    }
     private function handlePanVerification($data)
     {
         $pan = strtoupper(trim($data['pan'] ?? ''));
@@ -1392,6 +1494,7 @@ class ApiServiceController extends Controller
         }
     }
 
+
     private function handleDrivingLicenseVerification($data)
     {
         $licenseNumber = strtoupper(trim($data['dl_number'] ?? ''));
@@ -1475,4 +1578,6 @@ class ApiServiceController extends Controller
 
         return $this->handleResponse($response); // fallback for non-200 responses
     }
+
+
 }
