@@ -59,9 +59,14 @@ class User extends Authenticatable
     {
         return $this->hasMany(UserIp::class);
     }
+
     public function searchQueries()
     {
         return $this->hasMany(\App\Models\SearchQuery::class);
     }
 
+    public function apiEngines()
+    {
+        return $this->belongsToMany(ApiEngine::class, 'user_api_permissions');
+    }
 }

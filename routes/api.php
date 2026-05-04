@@ -1,22 +1,20 @@
 <?php
 
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\AdminController;
 use App\Http\Controllers\ApiServiceController;
 use App\Http\Controllers\Auth\EmailVerificationNotificationController;
 use App\Http\Controllers\Auth\VerifyEmailController;
-use App\Http\Controllers\GoogleAuthController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\GoogleAuthController;
 use App\Http\Controllers\ReportController;
-use App\Http\Controllers\AdminController;
-
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Route;
 
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
 
 Route::post('/resend-otp', [AuthController::class, 'resendOtp'])->middleware('throttle:5,1');
 Route::post('/verify-email-otp', [AuthController::class, 'verifyOtp'])->middleware('throttle:5,1');
-
 
 Route::middleware(['auth'])->group(function () {
     Route::post('/email/verification-notification', [EmailVerificationNotificationController::class, 'store'])
@@ -34,8 +32,6 @@ Route::middleware(['auth:sanctum', 'token.expire'])->get('/user', function (Requ
 });
 
 Route::middleware(['auth:sanctum', 'token.expire'])->post('/logout', [AuthController::class, 'logout']);
-
-
 
 // API SERVICE ROUTES (Secured with `auth:sanctum` & Rate Limiting)
 Route::middleware(['auth:sanctum', 'token.expire', 'throttle:30,1'])->group(function () {
@@ -62,17 +58,19 @@ Route::middleware(['auth:sanctum', 'token.expire', 'throttle:30,1'])->group(func
     // Route::get('/download-report/{filename}', [ReportController::class, 'downloadReport']);
 });
 
-
 // ADMIN ROUTES
 Route::middleware(['auth:sanctum', 'token.expire', 'admin', 'throttle:60,1'])->prefix('admin')->group(function () {
-    Route::get('/stats',                    [AdminController::class, 'stats']);
-    Route::get('/users',                    [AdminController::class, 'users']);
-    Route::post('/users',                   [AdminController::class, 'createUser']);
-    Route::get('/users/{id}',               [AdminController::class, 'user']);
-    Route::put('/users/{id}',               [AdminController::class, 'updateUser']);
-    Route::delete('/users/{id}',            [AdminController::class, 'deleteUser']);
-    Route::get('/queries',                  [AdminController::class, 'queries']);
-    Route::get('/users/{id}/queries',       [AdminController::class, 'userQueries']);
+    Route::get('/stats', [AdminController::class, 'stats']);
+    Route::get('/users', [AdminController::class, 'users']);
+    Route::post('/users', [AdminController::class, 'createUser']);
+    Route::get('/users/{id}', [AdminController::class, 'user']);
+    Route::put('/users/{id}', [AdminController::class, 'updateUser']);
+    Route::delete('/users/{id}', [AdminController::class, 'deleteUser']);
+    Route::get('/queries', [AdminController::class, 'queries']);
+    Route::get('/users/{id}/queries', [AdminController::class, 'userQueries']);
+    Route::get('/api-engines', [AdminController::class, 'apiEngines']);
+    Route::get('/users/{id}/permissions', [AdminController::class, 'userPermissions']);
+    Route::put('/users/{id}/permissions', [AdminController::class, 'updateUserPermissions']);
 });
 
 Route::get('/registration-status', function () {
@@ -80,8 +78,6 @@ Route::get('/registration-status', function () {
         'registration_enabled' => config('auth.registration_enabled'),
     ]);
 });
-
-
 
 // googlelogin route
 Route::post('/google-login', [GoogleAuthController::class, 'googleLogin']);

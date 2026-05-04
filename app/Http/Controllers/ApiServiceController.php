@@ -25,6 +25,26 @@ class ApiServiceController extends Controller
         return preg_replace('/\D/', '', $number);
     }
 
+    private function checkApiPermission(array $requestedSlugs): array
+    {
+        if (empty($requestedSlugs)) {
+            return [];
+        }
+
+        $user = auth()->user();
+
+        if ($user->is_admin) {
+            return $requestedSlugs;
+        }
+
+        $permittedSlugs = \App\Models\UserApiPermission::where('user_id', $user->id)
+            ->join('api_engines', 'user_api_permissions.api_engine_id', '=', 'api_engines.id')
+            ->pluck('api_engines.slug')
+            ->toArray();
+
+        return array_intersect($requestedSlugs, $permittedSlugs);
+    }
+
     private function fetchOsPhoneData(string $number): ?array
     {
         try {
@@ -119,7 +139,7 @@ class ApiServiceController extends Controller
                 return response()->json(['error' => 'Unable to parse phone number.'], 422);
             }
 
-            $number = $raw;
+$number = $raw;
             $user = auth()->user();
             $urls = [
                 'osint' => env('OSINTDATA_URL'),
@@ -139,19 +159,32 @@ class ApiServiceController extends Controller
 
             ];
 
+            $slugsToCheck = [
+                'osintData' => 'phone_osint',
+                'tcData' => 'phone_truecaller',
+                'wpData' => 'phone_whatsapp',
+                'telData' => 'phone_telegram',
+                'sKData' => 'phone_spkyc',
+                'suData' => 'phone_spupi',
+                'srData' => 'phone_sprc',
+                'signalHireData' => 'phone_snghire',
+            ];
+
+            $permittedSlugs = $this->checkApiPermission(array_values($slugsToCheck));
+
             try {
                 $requests = [
-                    'osintData' => fn($pool) => $pool->withHeaders([
+                    'osintData' => in_array('phone_osint', $permittedSlugs) ? fn($pool) => $pool->withHeaders([
                         'x-api-key' => env('X_API_KEY'),
                     ])->timeout(30)->get($urls['osint'], [
                                 'phone' => $number,
                                 'per_page' => 50,
-                            ]),
+                            ]) : null,
 
-                    'tcData' => fn($pool) => $pool->withHeaders([
+                    'tcData' => in_array('phone_truecaller', $permittedSlugs) ? fn($pool) => $pool->withHeaders([
                         'x-rapidapi-key' => env('TRUECALLER_API_KEY'),
                         'x-rapidapi-host' => env('TRUECALLER_API_HOST'),
-                    ])->timeout(40)->get($urls['truecaller'] . "/{$number}"),
+                    ])->timeout(40)->get($urls['truecaller'] . "/{$number}") : null,
 
 
                     // 'osPhoneData' => fn($pool) => $pool->withHeaders([
@@ -179,10 +212,10 @@ class ApiServiceController extends Controller
                     //             'number' => $localNumber,
                     //             'code' => $countryCode,
                     //         ]),
-                    'wpData' => fn($pool) => $pool->withHeaders([
+                    'wpData' => in_array('phone_whatsapp', $permittedSlugs) ? fn($pool) => $pool->withHeaders([
                         'x-rapidapi-key' => env('TEL_API_KEY'),
                         'x-rapidapi-host' => env('TEL_API_HOST'),
-                    ])->timeout(40)->get($urls['whatsapp'] . "/{$number}"),
+                    ])->timeout(40)->get($urls['whatsapp'] . "/{$number}") : null,
 
 
                     // 'telData' => fn($pool) => $pool->withHeaders([
@@ -190,7 +223,7 @@ class ApiServiceController extends Controller
                     // ])->retry(3, 300)->timeout(30)->post($urls['telegram'], [
                     //             'phone' => '+' . $number,
                     //         ]),
-
+ 
 
 
                     // 'allData' => fn($pool) => $pool->withHeaders([
@@ -203,18 +236,18 @@ class ApiServiceController extends Controller
                     //     'x-rapidapi-host' => env('SOCIAL_MEDIA_API_HOST'),
                     // ])->timeout(30)->get($urls['socialmedia'] . "/?phone={$number}"),
 
-                    'sKData' => fn($pool) => $pool->withHeaders([
+                    'sKData' => in_array('phone_spkyc', $permittedSlugs) ? fn($pool) => $pool->withHeaders([
                         'Content-Type' => 'application/json',
                         'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
                     ])->timeout(40)->post($urls['spkyc'], [
                                 'mobile' => $localNumber,
-                            ]),
-                    'suData' => fn($pool) => $pool->withHeaders([
+                            ]) : null,
+                    'suData' => in_array('phone_spupi', $permittedSlugs) ? fn($pool) => $pool->withHeaders([
                         'Content-Type' => 'application/json',
                         'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
                     ])->timeout(40)->post($urls['spupi'], [
                                 'mobile_number' => $localNumber,
-                            ]),
+                            ]) : null,
 
                     // 'sbData' => fn($pool) => $pool->withHeaders([
                     //     'Content-Type' => 'application/json',
@@ -222,27 +255,35 @@ class ApiServiceController extends Controller
                     // ])->timeout(30)->post($urls['spbank'], [
                     //             'mobile_no' => $localNumber,
                     //         ]),
-                    'srData' => fn($pool) => $pool->withHeaders([
+                    'srData' => in_array('phone_sprc', $permittedSlugs) ? fn($pool) => $pool->withHeaders([
                         'Content-Type' => 'application/json',
                         'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
                     ])->timeout(40)->post($urls['sprc'], [
                                 'mobile_number' => $localNumber,
-                            ]),
+                            ]) : null,
 
-                    'signalHireData' => fn($pool) => $pool->withHeaders([
+                    'signalHireData' => in_array('phone_snghire', $permittedSlugs) ? fn($pool) => $pool->withHeaders([
                         'X-API-Key' => env('FASTAPI_API_KEY'),
                     ])->timeout(70)->asJson()->post(env('SIGNALHIRE_URL'), [
                                 'items' => ['+' . $number],
-                            ]),
+                            ]) : null,
 
-                    'telData' => fn($pool) => $pool->withHeaders([
+                    'telData' => in_array('phone_telegram', $permittedSlugs) ? fn($pool) => $pool->withHeaders([
                         'x-api-key' => env('FASTAPI_API_KEY'),
                     ])->timeout(120)->connectTimeout(5)->asJson()->post($urls['telegram'], [
                                 'phone' => '+' . $number,
-                            ]),
+                            ]) : null,
 
                 ];
-                $responses = Http::pool(fn($pool) => array_map(fn($req) => $req($pool), $requests));
+                $activeRequests = array_filter($requests, fn($req) => $req !== null);
+                $responseMap = [];
+                if (!empty($activeRequests)) {
+                    $responses = Http::pool(fn($pool) => array_map(fn($req) => $req($pool), $activeRequests));
+                    $responseKeys = array_keys($activeRequests);
+                    foreach ($responseKeys as $index => $key) {
+                        $responseMap[$key] = $responses[$index] ?? null;
+                    }
+                }
             } catch (Exception $e) {
                 Log::error('API Pool Request Error', [
                     'number' => $number,
@@ -275,8 +316,13 @@ class ApiServiceController extends Controller
             }
 
 
-            foreach (array_keys($requests) as $index => $key) {
-                $response = $responses[$index];
+            foreach ($requests as $key => $req) {
+                $response = $responseMap[$key] ?? null;
+
+                if ($req === null) {
+                    $data[$key] = null;
+                    continue;
+                }
 
                 if ($response instanceof Throwable) {
                     Log::error("[$key] API Exception", [
@@ -288,15 +334,15 @@ class ApiServiceController extends Controller
                 }
 
                 try {
-                    if ($response->successful()) {
+                    if ($response && $response->successful()) {
                         $json = $response->json();
                         $data[$key] = $json;
                         $anySuccessful = true;
 
                     } else {
                         Log::warning("[$key] API Failed", [
-                            'status' => $response->status(),
-                            'body' => $response->body(),
+                            'status' => $response->status() ?? 'no response',
+                            'body' => $response->body() ?? 'no response',
                         ]);
                         $data[$key] = null;
                     }
@@ -373,12 +419,25 @@ class ApiServiceController extends Controller
                 // 'osEmail' => env('OSINT_EMAIL'),
             ];
 
-            $requests = [
-                'osintData' => fn($pool) => $pool->withHeaders([
-                    'x-api-key' => env('X_API_KEY'),
-                ])->timeout(30)->get($urls['osint'], ['email' => $email, 'per_page' => 50]),
+            $slugsToCheck = [
+                'osintData' => 'email_osint',
+                'zehefData' => 'email_zehef',
+                'holeheData' => 'email_holehe',
+                'socialScanData' => 'email_socialscan',
+                'emailData' => 'email_gmail',
+                'getuserData' => 'email_getuser',
+                'hibpData' => 'email_hibp',
+                'signalHireData' => 'email_signalhire',
+            ];
 
-                'zehefData' => fn($pool) => $pool->withHeaders(['x-api-key' => env('FASTAPI_API_KEY')])->timeout(60)->post($urls['zehef'], ['email' => $email]),
+            $permittedSlugs = $this->checkApiPermission(array_values($slugsToCheck));
+
+            $requests = [
+                'osintData' => in_array('email_osint', $permittedSlugs) ? fn($pool) => $pool->withHeaders([
+                    'x-api-key' => env('X_API_KEY'),
+                ])->timeout(30)->get($urls['osint'], ['email' => $email, 'per_page' => 50]) : null,
+
+                'zehefData' => in_array('email_zehef', $permittedSlugs) ? fn($pool) => $pool->withHeaders(['x-api-key' => env('FASTAPI_API_KEY')])->timeout(60)->post($urls['zehef'], ['email' => $email]) : null,
                 // 'osEmailData' => fn($pool) => $pool->withHeaders([
                 //     'api-key' => env('OSINT_API_KEY'),
                 //     'accept' => 'application/json',
@@ -386,23 +445,37 @@ class ApiServiceController extends Controller
                 //             'query' => $email,
                 //             'timeout' => 60
                 //         ]),
-                'holeheData' => fn($pool) => $pool->withHeaders(['x-api-key' => env('FASTAPI_API_KEY')])->timeout(30)->post($urls['holehe'], ['email' => $email]),
-                'socialScanData' => fn($pool) => $pool->withHeaders(['x-api-key' => env('FASTAPI_API_KEY')])->timeout(30)->asJson()->post($urls['socialscan'], ['email' => $email]),
-                'emailData' => fn($pool) => $pool->withHeaders(['x-api-key' => env('FASTAPI_API_KEY')])->timeout(30)->asJson()->post($urls['gmail'], ['email' => $email]),
-                'getuserData' => fn($pool) => $pool->timeout(30)->get($urls['getuser']),
-                'hibpData' => fn($pool) => $pool->withHeaders([
+                'holeheData' => in_array('email_holehe', $permittedSlugs) ? fn($pool) => $pool->withHeaders(['x-api-key' => env('FASTAPI_API_KEY')])->timeout(30)->post($urls['holehe'], ['email' => $email]) : null,
+                'socialScanData' => in_array('email_socialscan', $permittedSlugs) ? fn($pool) => $pool->withHeaders(['x-api-key' => env('FASTAPI_API_KEY')])->timeout(30)->asJson()->post($urls['socialscan'], ['email' => $email]) : null,
+                'emailData' => in_array('email_gmail', $permittedSlugs) ? fn($pool) => $pool->withHeaders(['x-api-key' => env('FASTAPI_API_KEY')])->timeout(30)->asJson()->post($urls['gmail'], ['email' => $email]) : null,
+                'getuserData' => in_array('email_getuser', $permittedSlugs) ? fn($pool) => $pool->timeout(30)->get($urls['getuser']) : null,
+                'hibpData' => in_array('email_hibp', $permittedSlugs) ? fn($pool) => $pool->withHeaders([
                     'hibp-api-key' => env('HIBP_API_KEY'),
                     'User-Agent' => 'LaravelApp/1.0',
-                ])->timeout(30)->get($urls['hibp'], ['truncateResponse' => 'false']),
-                'signalHireData' => fn($pool) => $pool->withHeaders(['X-API-Key' => env('FASTAPI_API_KEY')])->timeout(70)->asJson()->post(env('SIGNALHIRE_URL'), ['items' => [$email]]),
+                ])->timeout(30)->get($urls['hibp'], ['truncateResponse' => 'false']) : null,
+                'signalHireData' => in_array('email_signalhire', $permittedSlugs) ? fn($pool) => $pool->withHeaders(['X-API-Key' => env('FASTAPI_API_KEY')])->timeout(70)->asJson()->post(env('SIGNALHIRE_URL'), ['items' => [$email]]) : null,
             ];
 
-            $responses = Http::pool(fn($pool) => array_map(fn($req) => $req($pool), $requests));
+            $activeRequests = array_filter($requests, fn($req) => $req !== null);
+            $responseMap = [];
+            if (!empty($activeRequests)) {
+                $responses = Http::pool(fn($pool) => array_map(fn($req) => $req($pool), $activeRequests));
+                $responseKeys = array_keys($activeRequests);
+                foreach ($responseKeys as $index => $key) {
+                    $responseMap[$key] = $responses[$index] ?? null;
+                }
+            }
+
             $data = [];
             $anySuccessful = false;
 
-            foreach (array_keys($requests) as $index => $key) {
-                $response = $responses[$index];
+            foreach ($requests as $key => $req) {
+                $response = $responseMap[$key] ?? null;
+
+                if ($req === null) {
+                    $data[$key] = null;
+                    continue;
+                }
 
                 if ($response instanceof Throwable) {
                     Log::error("[$key] API Exception", ['type' => get_class($response), 'message' => $response->getMessage()]);
@@ -411,7 +484,7 @@ class ApiServiceController extends Controller
                 }
 
                 try {
-                    if ($response->successful()) {
+                    if ($response && $response->successful()) {
                         $json = $response->json();
 
                         if ($key === 'emailData' && isset($json['data']) && is_array($json['data'])) {
@@ -422,7 +495,7 @@ class ApiServiceController extends Controller
 
                         $anySuccessful = true;
                     } else {
-                        Log::warning("[$key] API Failed", ['status' => $response->status(), 'body' => $response->body()]);
+                        Log::warning("[$key] API Failed", ['status' => $response->status() ?? 'no response', 'body' => $response->body() ?? 'no response']);
                         $data[$key] = null;
                     }
                 } catch (Throwable $e) {
@@ -469,6 +542,16 @@ class ApiServiceController extends Controller
         $upiId = $request->input('upi_id');
 
         $user = auth()->user();
+        
+        $permittedSlugs = $this->checkApiPermission(['upi_full']);
+        if (empty($permittedSlugs)) {
+            return response()->json([
+                'data' => null,
+                'credits' => $user->credits,
+                'message' => 'Permission denied',
+            ]);
+        }
+
         SearchQuery::create([
             'user_id' => $user->id,
             'query' => $upiId,
@@ -527,6 +610,15 @@ class ApiServiceController extends Controller
 
         $idNumber = $request->input('id_number');
         $user = auth()->user();
+
+        $permittedSlugs = $this->checkApiPermission(['vehcle_rcfull']);
+        if (empty($permittedSlugs)) {
+            return response()->json([
+                'data' => null,
+                'credits' => $user->credits,
+                'message' => 'Permission denied',
+            ]);
+        }
 
         // ✅ Store search query + IP
         SearchQuery::create([
@@ -590,6 +682,15 @@ class ApiServiceController extends Controller
         $rcNumber = $request->input('rc_number');
         $user = auth()->user();
 
+        $permittedSlugs = $this->checkApiPermission(['vehicle_rc_challan']);
+        if (empty($permittedSlugs)) {
+            return response()->json([
+                'data' => null,
+                'credits' => $user->credits,
+                'message' => 'Permission denied',
+            ]);
+        }
+
         // ✅ Store search query + IP
         SearchQuery::create([
             'user_id' => $user->id,
@@ -651,6 +752,16 @@ class ApiServiceController extends Controller
         }
 
         $user = auth()->user();
+
+        $permittedSlugs = $this->checkApiPermission(['leakdata']);
+        if (empty($permittedSlugs)) {
+            return response()->json([
+                'data' => null,
+                'credits' => $user->credits,
+                'message' => 'Permission denied',
+            ]);
+        }
+
         SearchQuery::create([
             'user_id' => $user->id,
             'query' => json_encode($data),
@@ -726,6 +837,32 @@ class ApiServiceController extends Controller
         if (!$type || !$data) {
             return response()->json(['error' => 'Invalid search request'], 400);
         }
+
+        $slugMapping = [
+            'corporate_gstin' => 'corporate_gstin',
+            'credit_report' => 'corporate_credit_report',
+            'corporate_cin' => 'corporate_cin',
+            'gst_intel' => 'corporate_gst_intel',
+            'employment_history' => 'corporate_employment_history',
+            'find_uan' => 'corporate_find_uan',
+            'pan_to_uan' => 'corporate_pan_to_uan',
+            'pan_to_gstin' => 'corporate_pan_to_gstin',
+            'pan_to_udyam' => 'corporate_pan_to_udyam',
+        ];
+
+        $slug = $slugMapping[$type] ?? null;
+        if ($slug) {
+            $permittedSlugs = $this->checkApiPermission([$slug]);
+            if (empty($permittedSlugs)) {
+                $user = auth()->user();
+                return response()->json([
+                    'data' => null,
+                    'credits' => $user->credits,
+                    'message' => 'Permission denied',
+                ]);
+            }
+        }
+
         $user = auth()->user();
         SearchQuery::create([
             'user_id' => $user->id,
@@ -749,6 +886,10 @@ class ApiServiceController extends Controller
                 return $this->handleFindUan($data);
             case 'pan_to_uan':
                 return $this->handlePanToUan($data);
+            case 'pan_to_gstin':
+                return $this->handlePanToGstin($data);
+            case 'pan_to_udyam':
+                return $this->handlePanToUdyam($data);
             default:
                 return response()->json(['error' => 'Invalid search request'], 400);
         }
@@ -967,6 +1108,47 @@ class ApiServiceController extends Controller
             return $this->handleException($e);
         }
     }
+
+    private function handlePanToGstin($data)
+    {
+        $pan = strtoupper(trim($data['pan_number'] ?? ''));
+        if (!preg_match('/^[A-Z]{5}[0-9]{4}[A-Z]$/', $pan)) {
+            return response()->json(['error' => 'Invalid PAN number format'], 400);
+        }
+
+        try {
+            $response = Http::withHeaders([
+                'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
+                'Content-Type' => 'application/json',
+            ])->timeout(30)->post(env('PAN_TO_GSTIN_URL'), [
+                        'pan_number' => $pan,
+                    ]);
+            return $this->deductUserCredits($response, env('PAN_TO_GSTIN_COST'));
+        } catch (Exception $e) {
+            return $this->handleException($e);
+        }
+    }
+
+    private function handlePanToUdyam($data)
+    {
+        $pan = strtoupper(trim($data['pan_number'] ?? ''));
+        if (!preg_match('/^[A-Z]{5}[0-9]{4}[A-Z]$/', $pan)) {
+            return response()->json(['error' => 'Invalid PAN number format'], 400);
+        }
+
+        try {
+            $response = Http::withHeaders([
+                'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
+                'Content-Type' => 'application/json',
+            ])->timeout(30)->post(env('PAN_TO_UDYAM_URL'), [
+                        'pan_number' => $pan,
+                    ]);
+            return $this->deductUserCredits($response, env('PAN_TO_UDYAM_COST'));
+        } catch (Exception $e) {
+            return $this->handleException($e);
+        }
+    }
+
     private function deductUserCredits($response, float $deduction)
     {
         if ($response->successful()) {
@@ -1034,6 +1216,30 @@ class ApiServiceController extends Controller
         $type = $request->input('type');
         $data = $request->input('data');
         $user = auth()->user();
+
+        $slugMapping = [
+            'pan' => 'verified_id_pan',
+            'voter_id' => 'verified_id_voter_id',
+            'employment' => 'verified_id_employment',
+            'bank_account' => 'verified_id_bank_account',
+            'passport' => 'verified_id_passport',
+            'vehicle_rc' => 'verified_id_rc',
+            'ifsc' => 'verified_id_ifsc',
+            'driving_license' => 'verified_id_driving_license',
+        ];
+
+        $slug = $slugMapping[$type] ?? null;
+        if ($slug) {
+            $permittedSlugs = $this->checkApiPermission([$slug]);
+            if (empty($permittedSlugs)) {
+                return response()->json([
+                    'data' => null,
+                    'credits' => $user->credits,
+                    'message' => 'Permission denied',
+                ]);
+            }
+        }
+
         SearchQuery::create([
             'user_id' => $user->id,
             'query' => json_encode($data),

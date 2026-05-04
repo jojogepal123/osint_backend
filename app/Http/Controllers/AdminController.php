@@ -2,8 +2,9 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\User;
+use App\Models\ApiEngine;
 use App\Models\SearchQuery;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rules\Password;
@@ -19,9 +20,9 @@ class AdminController extends Controller
     private function auditLog(string $action, array $context = []): void
     {
         Log::channel('stack')->info("[ADMIN AUDIT] {$action}", array_merge([
-            'admin_id'    => auth()->id(),
+            'admin_id' => auth()->id(),
             'admin_email' => auth()->user()?->email,
-            'ip'          => request()->ip(),
+            'ip' => request()->ip(),
         ], $context));
     }
 
@@ -29,8 +30,8 @@ class AdminController extends Controller
     public function stats()
     {
         return response()->json([
-            'total_users'   => User::count(),
-            'admin_users'   => User::where('is_admin', true)->count(),
+            'total_users' => User::count(),
+            'admin_users' => User::where('is_admin', true)->count(),
             'total_queries' => SearchQuery::count(),
             'queries_today' => SearchQuery::whereDate('created_at', today())->count(),
             'queries_by_type' => SearchQuery::selectRaw('type, count(*) as count')
@@ -43,9 +44,9 @@ class AdminController extends Controller
     public function users(Request $request)
     {
         $request->validate([
-            'search'   => 'sometimes|string|max:100',
+            'search' => 'sometimes|string|max:100',
             'app_mode' => 'sometimes|in:trial,live',
-            'page'     => 'sometimes|integer|min:1|max:1000',
+            'page' => 'sometimes|integer|min:1|max:1000',
         ]);
 
         $query = User::select(self::USER_FIELDS)
@@ -54,7 +55,7 @@ class AdminController extends Controller
         if ($search = $request->query('search')) {
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('email', 'like', "%{$search}%");
+                    ->orWhere('email', 'like', "%{$search}%");
             });
         }
 
@@ -62,7 +63,27 @@ class AdminController extends Controller
             $query->where('app_mode', $mode);
         }
 
-        return response()->json($query->latest()->paginate(15));
+        $users = $query->latest()->paginate(15);
+
+        $allApiEngineIds = ApiEngine::all()->pluck('id')->toArray();
+        $totalApis = count($allApiEngineIds);
+
+        $users->getCollection()->transform(function ($user) use ($totalApis, $allApiEngineIds) {
+            $userData = $user->toArray();
+            if ($user->is_admin) {
+                $userData['api_count'] = $totalApis;
+                $userData['has_all_apis'] = true;
+                $userData['api_engine_ids'] = $allApiEngineIds;
+            } else {
+                $userData['api_count'] = $user->apiEngines->count();
+                $userData['has_all_apis'] = false;
+                $userData['api_engine_ids'] = $user->apiEngines->pluck('id')->toArray();
+            }
+
+            return $userData;
+        });
+
+        return response()->json($users);
     }
 
     // ── Single User ─────────────────────────────────────────────────────────
@@ -80,8 +101,16 @@ class AdminController extends Controller
             ->groupBy('type')
             ->pluck('count', 'type');
 
+        $apiEngines = $user->is_admin
+            ? ApiEngine::all()->pluck('id')->toArray()
+            : $user->apiEngines->pluck('id')->toArray();
+
+        $userData = $user->toArray();
+        $userData['api_engine_ids'] = $apiEngines;
+        $userData['api_count'] = count($apiEngines);
+
         return response()->json([
-            'user'            => $user,
+            'user' => $userData,
             'queries_by_type' => $queriesByType,
         ]);
     }
@@ -90,22 +119,22 @@ class AdminController extends Controller
     public function createUser(Request $request)
     {
         $validated = $request->validate([
-            'name'     => 'required|string|max:255|regex:/^[\pL\s\-]+$/u',
-            'email'    => 'required|email:rfc,dns|max:255|unique:users,email',
+            'name' => 'required|string|max:255|regex:/^[\pL\s\-]+$/u',
+            'email' => 'required|email:rfc,dns|max:255|unique:users,email',
             'password' => ['required', 'string', Password::min(8)->mixedCase()->numbers()],
-            'credits'  => 'sometimes|numeric|min:0|max:999999',
+            'credits' => 'sometimes|numeric|min:0|max:999999',
             'app_mode' => 'sometimes|in:trial,live',
             'is_admin' => 'sometimes|boolean',
         ]);
 
         $user = User::create([
-            'name'               => $validated['name'],
-            'email'              => $validated['email'],
-            'password'           => bcrypt($validated['password']),
-            'email_verified_at'  => now(),
-            'credits'            => $validated['credits'] ?? 0,
-            'app_mode'           => $validated['app_mode'] ?? 'live',
-            'is_admin'           => $validated['is_admin'] ?? false,
+            'name' => $validated['name'],
+            'email' => $validated['email'],
+            'password' => bcrypt($validated['password']),
+            'email_verified_at' => now(),
+            'credits' => $validated['credits'] ?? 0,
+            'app_mode' => $validated['app_mode'] ?? 'live',
+            'is_admin' => $validated['is_admin'] ?? false,
         ]);
 
         $this->auditLog('USER_CREATED', ['target_id' => $user->id, 'target_email' => $user->email]);
@@ -121,14 +150,14 @@ class AdminController extends Controller
         $user = User::findOrFail((int) $id);
 
         $validated = $request->validate([
-            'name'     => 'sometimes|string|max:255',
-            'credits'  => 'sometimes|numeric|min:0|max:999999',
+            'name' => 'sometimes|string|max:255',
+            'credits' => 'sometimes|numeric|min:0|max:999999',
             'app_mode' => 'sometimes|in:trial,live',
             'is_admin' => 'sometimes|boolean',
         ]);
 
         // Prevent admin from revoking their own admin access
-        if (isset($validated['is_admin']) && !$validated['is_admin'] && $user->id === auth()->id()) {
+        if (isset($validated['is_admin']) && ! $validated['is_admin'] && $user->id === auth()->id()) {
             return response()->json(['error' => 'You cannot revoke your own admin access.'], 422);
         }
 
@@ -136,10 +165,10 @@ class AdminController extends Controller
         $user->update($validated);
 
         $this->auditLog('USER_UPDATED', [
-            'target_id'    => $user->id,
+            'target_id' => $user->id,
             'target_email' => $user->email,
-            'before'       => $before,
-            'after'        => $validated,
+            'before' => $before,
+            'after' => $validated,
         ]);
 
         return response()->json(['message' => 'User updated.', 'user' => $user->only(self::USER_FIELDS)]);
@@ -172,10 +201,10 @@ class AdminController extends Controller
     public function queries(Request $request)
     {
         $request->validate([
-            'search'  => 'sometimes|string|max:100',
-            'type'    => 'sometimes|in:' . implode(',', self::VALID_TYPES),
+            'search' => 'sometimes|string|max:100',
+            'type' => 'sometimes|in:'.implode(',', self::VALID_TYPES),
             'user_id' => 'sometimes|integer|min:1',
-            'page'    => 'sometimes|integer|min:1|max:1000',
+            'page' => 'sometimes|integer|min:1|max:1000',
         ]);
 
         $query = SearchQuery::with('user:id,name,email')->latest();
@@ -201,7 +230,7 @@ class AdminController extends Controller
         abort_unless(is_numeric($id), 400, 'Invalid user ID.');
 
         $request->validate([
-            'type' => 'sometimes|in:' . implode(',', self::VALID_TYPES),
+            'type' => 'sometimes|in:'.implode(',', self::VALID_TYPES),
             'page' => 'sometimes|integer|min:1|max:1000',
         ]);
 
@@ -217,5 +246,62 @@ class AdminController extends Controller
         }
 
         return response()->json($query->paginate(20));
+    }
+
+    // ── API Engines List ───────────────────────────────────────────────────
+    public function apiEngines()
+    {
+        $engines = ApiEngine::orderBy('category')->orderBy('name')->get();
+
+        return response()->json($engines);
+    }
+
+    // ── User's API Permissions ─────────────────────────────────────────────
+    public function userPermissions($id)
+    {
+        abort_unless(is_numeric($id), 400, 'Invalid user ID.');
+
+        $user = User::findOrFail((int) $id);
+
+        if ($user->is_admin) {
+            $allEngines = ApiEngine::all();
+
+            return response()->json([
+                'is_admin' => true,
+                'permissions' => $allEngines->pluck('id')->toArray(),
+            ]);
+        }
+
+        return response()->json([
+            'is_admin' => false,
+            'permissions' => $user->apiEngines->pluck('id')->toArray(),
+        ]);
+    }
+
+    // ── Update User's API Permissions ───────────────────────────────────────
+    public function updateUserPermissions(Request $request, $id)
+    {
+        abort_unless(is_numeric($id), 400, 'Invalid user ID.');
+
+        $user = User::findOrFail((int) $id);
+
+        if ($user->is_admin) {
+            return response()->json(['error' => 'Admin users have full access to all APIs.'], 422);
+        }
+
+        $validated = $request->validate([
+            'api_engine_ids' => 'required|array',
+            'api_engine_ids.*' => 'integer|exists:api_engines,id',
+        ]);
+
+        $user->apiEngines()->sync($validated['api_engine_ids']);
+
+        $this->auditLog('USER_PERMISSIONS_UPDATED', [
+            'target_id' => $user->id,
+            'target_email' => $user->email,
+            'api_count' => count($validated['api_engine_ids']),
+        ]);
+
+        return response()->json(['message' => 'Permissions updated.']);
     }
 }
