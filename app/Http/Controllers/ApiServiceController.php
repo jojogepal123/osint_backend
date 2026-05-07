@@ -3,20 +3,19 @@
 namespace App\Http\Controllers;
 
 // use Google\Service\Storage;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Http;
-use HlrLookup\HLRLookupClient;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Arr;
-use Illuminate\Http\Client\ConnectionException;
-use GuzzleHttpException\RequestException; // Import this
-use Illuminate\Support\Facades\Storage;
-use Exception;
-use Throwable;
-use libphonenumber\PhoneNumberUtil;
-use libphonenumber\NumberParseException;
 use App\Models\SearchQuery;
-
+use Exception;
+use HlrLookup\HLRLookupClient;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
+// Import this
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
+use libphonenumber\NumberParseException;
+use libphonenumber\PhoneNumberUtil;
+use Throwable;
 
 class ApiServiceController extends Controller
 {
@@ -84,8 +83,6 @@ class ApiServiceController extends Controller
         return null; // no data, but no fatal error
     }
 
-
-
     public function getTelData(Request $request)
     {
         // Make sure this request itself is allowed to run longer than 60s (if needed)
@@ -122,11 +119,12 @@ class ApiServiceController extends Controller
             ]);
             try {
                 // parse with null region so numbers starting with country code are understood
-                $proto = $phoneUtil->parse($raw, "IN");
+                $proto = $phoneUtil->parse($raw, 'IN');
 
                 // Validate
-                if (!$phoneUtil->isValidNumber($proto)) {
+                if (! $phoneUtil->isValidNumber($proto)) {
                     Log::warning('libphonenumber: invalid number', ['raw' => $raw]);
+
                     return response()->json(['error' => 'Invalid phone number.'], 422);
                 }
 
@@ -136,10 +134,11 @@ class ApiServiceController extends Controller
                 Log::info('Parsed phone via libphonenumber', ['raw' => $raw, 'code' => $countryCode, 'local' => $localNumber]);
             } catch (NumberParseException $ex) {
                 Log::warning('libphonenumber parse failed', ['raw' => $raw, 'error' => $ex->getMessage()]);
+
                 return response()->json(['error' => 'Unable to parse phone number.'], 422);
             }
 
-$number = $raw;
+            $number = $raw;
             $user = auth()->user();
             $urls = [
                 'osint' => env('OSINTDATA_URL'),
@@ -174,18 +173,17 @@ $number = $raw;
 
             try {
                 $requests = [
-                    'osintData' => in_array('phone_osint', $permittedSlugs) ? fn($pool) => $pool->withHeaders([
+                    'osintData' => in_array('phone_osint', $permittedSlugs) ? fn ($pool) => $pool->withHeaders([
                         'x-api-key' => env('X_API_KEY'),
                     ])->timeout(30)->get($urls['osint'], [
-                                'phone' => $number,
-                                'per_page' => 50,
-                            ]) : null,
+                        'phone' => $number,
+                        'per_page' => 50,
+                    ]) : null,
 
-                    'tcData' => in_array('phone_truecaller', $permittedSlugs) ? fn($pool) => $pool->withHeaders([
+                    'tcData' => in_array('phone_truecaller', $permittedSlugs) ? fn ($pool) => $pool->withHeaders([
                         'x-rapidapi-key' => env('TRUECALLER_API_KEY'),
                         'x-rapidapi-host' => env('TRUECALLER_API_HOST'),
-                    ])->timeout(40)->get($urls['truecaller'] . "/{$number}") : null,
-
+                    ])->timeout(40)->get($urls['truecaller']."/{$number}") : null,
 
                     // 'osPhoneData' => fn($pool) => $pool->withHeaders([
                     //     'api-key' => env('OSINT_API_KEY'),
@@ -212,19 +210,16 @@ $number = $raw;
                     //             'number' => $localNumber,
                     //             'code' => $countryCode,
                     //         ]),
-                    'wpData' => in_array('phone_whatsapp', $permittedSlugs) ? fn($pool) => $pool->withHeaders([
+                    'wpData' => in_array('phone_whatsapp', $permittedSlugs) ? fn ($pool) => $pool->withHeaders([
                         'x-rapidapi-key' => env('TEL_API_KEY'),
                         'x-rapidapi-host' => env('TEL_API_HOST'),
-                    ])->timeout(40)->get($urls['whatsapp'] . "/{$number}") : null,
-
+                    ])->timeout(40)->get($urls['whatsapp']."/{$number}") : null,
 
                     // 'telData' => fn($pool) => $pool->withHeaders([
                     //     'Content-Type' => 'application/json',
                     // ])->retry(3, 300)->timeout(30)->post($urls['telegram'], [
                     //             'phone' => '+' . $number,
                     //         ]),
- 
-
 
                     // 'allData' => fn($pool) => $pool->withHeaders([
                     //     'x-rapidapi-host' => env('ALL_MOBILE_API_HOST'),
@@ -236,18 +231,18 @@ $number = $raw;
                     //     'x-rapidapi-host' => env('SOCIAL_MEDIA_API_HOST'),
                     // ])->timeout(30)->get($urls['socialmedia'] . "/?phone={$number}"),
 
-                    'sKData' => in_array('phone_spkyc', $permittedSlugs) ? fn($pool) => $pool->withHeaders([
+                    'sKData' => in_array('phone_spkyc', $permittedSlugs) ? fn ($pool) => $pool->withHeaders([
                         'Content-Type' => 'application/json',
-                        'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
+                        'Authorization' => 'Bearer '.env('SUREPASS_KYC_TOKEN'),
                     ])->timeout(40)->post($urls['spkyc'], [
-                                'mobile' => $localNumber,
-                            ]) : null,
-                    'suData' => in_array('phone_spupi', $permittedSlugs) ? fn($pool) => $pool->withHeaders([
+                        'mobile' => $localNumber,
+                    ]) : null,
+                    'suData' => in_array('phone_spupi', $permittedSlugs) ? fn ($pool) => $pool->withHeaders([
                         'Content-Type' => 'application/json',
-                        'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
+                        'Authorization' => 'Bearer '.env('SUREPASS_KYC_TOKEN'),
                     ])->timeout(40)->post($urls['spupi'], [
-                                'mobile_number' => $localNumber,
-                            ]) : null,
+                        'mobile_number' => $localNumber,
+                    ]) : null,
 
                     // 'sbData' => fn($pool) => $pool->withHeaders([
                     //     'Content-Type' => 'application/json',
@@ -255,30 +250,30 @@ $number = $raw;
                     // ])->timeout(30)->post($urls['spbank'], [
                     //             'mobile_no' => $localNumber,
                     //         ]),
-                    'srData' => in_array('phone_sprc', $permittedSlugs) ? fn($pool) => $pool->withHeaders([
+                    'srData' => in_array('phone_sprc', $permittedSlugs) ? fn ($pool) => $pool->withHeaders([
                         'Content-Type' => 'application/json',
-                        'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
+                        'Authorization' => 'Bearer '.env('SUREPASS_KYC_TOKEN'),
                     ])->timeout(40)->post($urls['sprc'], [
-                                'mobile_number' => $localNumber,
-                            ]) : null,
+                        'mobile_number' => $localNumber,
+                    ]) : null,
 
-                    'signalHireData' => in_array('phone_snghire', $permittedSlugs) ? fn($pool) => $pool->withHeaders([
+                    'signalHireData' => in_array('phone_snghire', $permittedSlugs) ? fn ($pool) => $pool->withHeaders([
                         'X-API-Key' => env('FASTAPI_API_KEY'),
                     ])->timeout(70)->asJson()->post(env('SIGNALHIRE_URL'), [
-                                'items' => ['+' . $number],
-                            ]) : null,
+                        'items' => ['+'.$number],
+                    ]) : null,
 
-                    'telData' => in_array('phone_telegram', $permittedSlugs) ? fn($pool) => $pool->withHeaders([
+                    'telData' => in_array('phone_telegram', $permittedSlugs) ? fn ($pool) => $pool->withHeaders([
                         'x-api-key' => env('FASTAPI_API_KEY'),
                     ])->timeout(120)->connectTimeout(5)->asJson()->post($urls['telegram'], [
-                                'phone' => '+' . $number,
-                            ]) : null,
+                        'phone' => '+'.$number,
+                    ]) : null,
 
                 ];
-                $activeRequests = array_filter($requests, fn($req) => $req !== null);
+                $activeRequests = array_filter($requests, fn ($req) => $req !== null);
                 $responseMap = [];
-                if (!empty($activeRequests)) {
-                    $responses = Http::pool(fn($pool) => array_map(fn($req) => $req($pool), $activeRequests));
+                if (! empty($activeRequests)) {
+                    $responses = Http::pool(fn ($pool) => array_map(fn ($req) => $req($pool), $activeRequests));
                     $responseKeys = array_keys($activeRequests);
                     foreach ($responseKeys as $index => $key) {
                         $responseMap[$key] = $responses[$index] ?? null;
@@ -315,12 +310,12 @@ $number = $raw;
                 ]);
             }
 
-
             foreach ($requests as $key => $req) {
                 $response = $responseMap[$key] ?? null;
 
                 if ($req === null) {
                     $data[$key] = null;
+
                     continue;
                 }
 
@@ -330,6 +325,7 @@ $number = $raw;
                         'message' => $response->getMessage(),
                     ]);
                     $data[$key] = null;
+
                     continue;
                 }
 
@@ -372,7 +368,6 @@ $number = $raw;
 
             // Log::info($data);
 
-
             return response()->json([
                 ...$data,
                 'credits' => $user->credits,
@@ -383,10 +378,10 @@ $number = $raw;
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
+
             return response()->json(['error' => 'An internal server error occurred.'], 500);
         }
     }
-
 
     public function getEmailData(Request $request)
     {
@@ -414,8 +409,8 @@ $number = $raw;
                 'holehe' => env('HOLEHEDATA_URL'),
                 'gmail' => env('EMAILDATA_URL'),
                 'socialscan' => env('SOCIALSCAN_URL'),
-                'hibp' => env('HIBPDATA_URL') . "/{$email}",
-                'getuser' => env('GETUSER_API_BASE') . "?email={$encodedEmail}&apikey=" . env('GETUSER_API_KEY'),
+                'hibp' => env('HIBPDATA_URL')."/{$email}",
+                'getuser' => env('GETUSER_API_BASE')."?email={$encodedEmail}&apikey=".env('GETUSER_API_KEY'),
                 // 'osEmail' => env('OSINT_EMAIL'),
             ];
 
@@ -433,11 +428,11 @@ $number = $raw;
             $permittedSlugs = $this->checkApiPermission(array_values($slugsToCheck));
 
             $requests = [
-                'osintData' => in_array('email_osint', $permittedSlugs) ? fn($pool) => $pool->withHeaders([
+                'osintData' => in_array('email_osint', $permittedSlugs) ? fn ($pool) => $pool->withHeaders([
                     'x-api-key' => env('X_API_KEY'),
                 ])->timeout(30)->get($urls['osint'], ['email' => $email, 'per_page' => 50]) : null,
 
-                'zehefData' => in_array('email_zehef', $permittedSlugs) ? fn($pool) => $pool->withHeaders(['x-api-key' => env('FASTAPI_API_KEY')])->timeout(60)->post($urls['zehef'], ['email' => $email]) : null,
+                'zehefData' => in_array('email_zehef', $permittedSlugs) ? fn ($pool) => $pool->withHeaders(['x-api-key' => env('FASTAPI_API_KEY')])->timeout(60)->post($urls['zehef'], ['email' => $email]) : null,
                 // 'osEmailData' => fn($pool) => $pool->withHeaders([
                 //     'api-key' => env('OSINT_API_KEY'),
                 //     'accept' => 'application/json',
@@ -445,21 +440,21 @@ $number = $raw;
                 //             'query' => $email,
                 //             'timeout' => 60
                 //         ]),
-                'holeheData' => in_array('email_holehe', $permittedSlugs) ? fn($pool) => $pool->withHeaders(['x-api-key' => env('FASTAPI_API_KEY')])->timeout(30)->post($urls['holehe'], ['email' => $email]) : null,
-                'socialScanData' => in_array('email_socialscan', $permittedSlugs) ? fn($pool) => $pool->withHeaders(['x-api-key' => env('FASTAPI_API_KEY')])->timeout(30)->asJson()->post($urls['socialscan'], ['email' => $email]) : null,
-                'emailData' => in_array('email_gmail', $permittedSlugs) ? fn($pool) => $pool->withHeaders(['x-api-key' => env('FASTAPI_API_KEY')])->timeout(30)->asJson()->post($urls['gmail'], ['email' => $email]) : null,
-                'getuserData' => in_array('email_getuser', $permittedSlugs) ? fn($pool) => $pool->timeout(30)->get($urls['getuser']) : null,
-                'hibpData' => in_array('email_hibp', $permittedSlugs) ? fn($pool) => $pool->withHeaders([
+                'holeheData' => in_array('email_holehe', $permittedSlugs) ? fn ($pool) => $pool->withHeaders(['x-api-key' => env('FASTAPI_API_KEY')])->timeout(30)->post($urls['holehe'], ['email' => $email]) : null,
+                'socialScanData' => in_array('email_socialscan', $permittedSlugs) ? fn ($pool) => $pool->withHeaders(['x-api-key' => env('FASTAPI_API_KEY')])->timeout(30)->asJson()->post($urls['socialscan'], ['email' => $email]) : null,
+                'emailData' => in_array('email_gmail', $permittedSlugs) ? fn ($pool) => $pool->withHeaders(['x-api-key' => env('FASTAPI_API_KEY')])->timeout(30)->asJson()->post($urls['gmail'], ['email' => $email]) : null,
+                'getuserData' => in_array('email_getuser', $permittedSlugs) ? fn ($pool) => $pool->timeout(30)->get($urls['getuser']) : null,
+                'hibpData' => in_array('email_hibp', $permittedSlugs) ? fn ($pool) => $pool->withHeaders([
                     'hibp-api-key' => env('HIBP_API_KEY'),
                     'User-Agent' => 'LaravelApp/1.0',
                 ])->timeout(30)->get($urls['hibp'], ['truncateResponse' => 'false']) : null,
-                'signalHireData' => in_array('email_signalhire', $permittedSlugs) ? fn($pool) => $pool->withHeaders(['X-API-Key' => env('FASTAPI_API_KEY')])->timeout(70)->asJson()->post(env('SIGNALHIRE_URL'), ['items' => [$email]]) : null,
+                'signalHireData' => in_array('email_signalhire', $permittedSlugs) ? fn ($pool) => $pool->withHeaders(['X-API-Key' => env('FASTAPI_API_KEY')])->timeout(70)->asJson()->post(env('SIGNALHIRE_URL'), ['items' => [$email]]) : null,
             ];
 
-            $activeRequests = array_filter($requests, fn($req) => $req !== null);
+            $activeRequests = array_filter($requests, fn ($req) => $req !== null);
             $responseMap = [];
-            if (!empty($activeRequests)) {
-                $responses = Http::pool(fn($pool) => array_map(fn($req) => $req($pool), $activeRequests));
+            if (! empty($activeRequests)) {
+                $responses = Http::pool(fn ($pool) => array_map(fn ($req) => $req($pool), $activeRequests));
                 $responseKeys = array_keys($activeRequests);
                 foreach ($responseKeys as $index => $key) {
                     $responseMap[$key] = $responses[$index] ?? null;
@@ -474,12 +469,14 @@ $number = $raw;
 
                 if ($req === null) {
                     $data[$key] = null;
+
                     continue;
                 }
 
                 if ($response instanceof Throwable) {
                     Log::error("[$key] API Exception", ['type' => get_class($response), 'message' => $response->getMessage()]);
                     $data[$key] = null;
+
                     continue;
                 }
 
@@ -530,9 +527,11 @@ $number = $raw;
                 'email' => $request->query('email'),
                 'error' => $e->getMessage(),
             ]);
+
             return response()->json(['error' => 'Server error occurred.'], 500);
         }
     }
+
     public function getUpiFullDetails(Request $request)
     {
         $request->validate([
@@ -542,7 +541,7 @@ $number = $raw;
         $upiId = $request->input('upi_id');
 
         $user = auth()->user();
-        
+
         $permittedSlugs = $this->checkApiPermission(['upi_full']);
         if (empty($permittedSlugs)) {
             return response()->json([
@@ -560,16 +559,15 @@ $number = $raw;
         ]);
         try {
             $response = Http::withHeaders([
-                'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
+                'Authorization' => 'Bearer '.env('SUREPASS_KYC_TOKEN'),
                 'Content-Type' => 'application/json',
             ])->timeout(30)->post(env('SPUPI_FULL_URL'), [
-                        'upi_id' => $upiId,
-                    ]);
+                'upi_id' => $upiId,
+            ]);
 
             if ($response->successful()) {
                 $data = $response->json();
                 $deduction = env('UPI_COST');
-
 
                 // Check if user has sufficient credits
                 if ($user->credits >= $deduction) {
@@ -590,7 +588,7 @@ $number = $raw;
                 return response()->json([
                     'error' => 'Failed to fetch UPI details',
                     'status' => $response->status(),
-                    'body' => $response->body()
+                    'body' => $response->body(),
                 ], $response->status());
             }
         } catch (Throwable $e) {
@@ -598,6 +596,7 @@ $number = $raw;
                 'error' => $e->getMessage(),
                 'upi_id' => $upiId,
             ]);
+
             return response()->json(['error' => 'Server error occurred.'], 500);
         }
     }
@@ -628,19 +627,17 @@ $number = $raw;
             'ip_address' => $request->ip(),
         ]);
 
-
         try {
             $response = Http::withHeaders([
-                'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
+                'Authorization' => 'Bearer '.env('SUREPASS_KYC_TOKEN'),
                 'Content-Type' => 'application/json',
             ])->timeout(30)->post(env('SPRCTXT_URL'), [
-                        'id_number' => $idNumber,
-                    ]);
+                'id_number' => $idNumber,
+            ]);
 
             if ($response->successful()) {
                 $data = $response->json();
                 $deduction = env('RC_COST');
-
 
                 // Check if user has sufficient credits
                 if ($user->credits >= $deduction) {
@@ -661,7 +658,7 @@ $number = $raw;
                 return response()->json([
                     'error' => 'Failed to fetch RC details',
                     'status' => $response->status(),
-                    'body' => $response->body()
+                    'body' => $response->body(),
                 ], $response->status());
             }
         } catch (Throwable $e) {
@@ -669,6 +666,7 @@ $number = $raw;
                 'error' => $e->getMessage(),
                 'id_number' => $idNumber,
             ]);
+
             return response()->json(['error' => 'Server error occurred.'], 500);
         }
     }
@@ -699,14 +697,13 @@ $number = $raw;
             'ip_address' => $request->ip(),
         ]);
 
-
         try {
             $response = Http::withHeaders([
-                'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
+                'Authorization' => 'Bearer '.env('SUREPASS_KYC_TOKEN'),
                 'Content-Type' => 'application/json',
             ])->timeout(30)->post(env('SPRCCHALLAN_URL'), [
-                        'rc_number' => $rcNumber,
-                    ]);
+                'rc_number' => $rcNumber,
+            ]);
 
             if ($response->successful()) {
                 // Deduct 7.00 credits from authenticated user
@@ -717,7 +714,7 @@ $number = $raw;
                 } else {
                     return response()->json([
                         'message' => 'Insufficient credits',
-                        'credits' => $user->credits
+                        'credits' => $user->credits,
                     ], 402);
                 }
 
@@ -729,7 +726,7 @@ $number = $raw;
                 return response()->json([
                     'error' => 'Failed to fetch RC Challan details',
                     'status' => $response->status(),
-                    'body' => $response->body()
+                    'body' => $response->body(),
                 ], $response->status());
             }
         } catch (Throwable $e) {
@@ -737,6 +734,7 @@ $number = $raw;
                 'error' => $e->getMessage(),
                 'rc_number' => $rcNumber,
             ]);
+
             return response()->json(['error' => 'Server error occurred.'], 500);
         }
     }
@@ -747,7 +745,7 @@ $number = $raw;
         $page = (int) $request->query('page', 1);
         $perPage = (int) $request->query('per_page', 10);
         $anySuccessful = false;
-        if (!$data || !is_array($data)) {
+        if (! $data || ! is_array($data)) {
             return response()->json(['error' => 'Invalid search data'], 400);
         }
 
@@ -784,7 +782,7 @@ $number = $raw;
             }
         }
 
-        if (!$hasKeyValue) {
+        if (! $hasKeyValue) {
             return response()->json(['error' => 'No valid search parameters provided'], 400);
         }
         try {
@@ -812,7 +810,6 @@ $number = $raw;
                     }
                 }
 
-
                 return response()->json([
                     ...$data,
                     'credits' => $user->credits,
@@ -825,6 +822,7 @@ $number = $raw;
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
+
             return response()->json(['error' => 'An internal server error occurred.'], 500);
         }
     }
@@ -834,7 +832,7 @@ $number = $raw;
         $type = $request->input('type');
         $data = $request->input('data');
 
-        if (!$type || !$data) {
+        if (! $type || ! $data) {
             return response()->json(['error' => 'Invalid search request'], 400);
         }
 
@@ -855,6 +853,7 @@ $number = $raw;
             $permittedSlugs = $this->checkApiPermission([$slug]);
             if (empty($permittedSlugs)) {
                 $user = auth()->user();
+
                 return response()->json([
                     'data' => null,
                     'credits' => $user->credits,
@@ -898,21 +897,22 @@ $number = $raw;
     private function handleCorporateGstin($data)
     {
         $idNumber = $data['id_number'] ?? null;
-        if (!$idNumber) {
+        if (! $idNumber) {
             return response()->json(['error' => 'ID number is required'], 400);
         }
         $idNumber = strtoupper(trim($idNumber));
-        if (!preg_match('/^[A-Z0-9]+$/', $idNumber)) {
+        if (! preg_match('/^[A-Z0-9]+$/', $idNumber)) {
             return response()->json(['error' => 'Invalid ID number format'], 400);
         }
 
         try {
             $response = Http::withHeaders([
-                'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
+                'Authorization' => 'Bearer '.env('SUREPASS_KYC_TOKEN'),
                 'Content-Type' => 'application/json',
             ])->timeout(30)->post(env('CORPORATE_GSTIN_URL'), [
-                        'id_number' => $idNumber,
-                    ]);
+                'id_number' => $idNumber,
+            ]);
+
             return $this->deductUserCredits($response, env('CORPORATE_GSTIN_COST'));
 
             // return $this->handleSurepassResponse($response);
@@ -933,29 +933,29 @@ $number = $raw;
 
         try {
             $response = Http::withHeaders([
-                'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
+                'Authorization' => 'Bearer '.env('SUREPASS_KYC_TOKEN'),
                 'Content-Type' => 'application/json',
             ])->timeout(30)->post(env('CORPORATE_CREDIT_URL'), [
-                        'mobile' => $data['mobile'],
-                        'pan' => $data['pan'],
-                        'name' => $data['name'],
-                        'gender' => $data['gender'],
-                        'consent' => $data['consent'],
-                    ]);
+                'mobile' => $data['mobile'],
+                'pan' => $data['pan'],
+                'name' => $data['name'],
+                'gender' => $data['gender'],
+                'consent' => $data['consent'],
+            ]);
 
             if ($response->successful()) {
                 $json = $response->json();
                 $pdfUrl = $json['data']['credit_report_link'] ?? null;
-                if (!$pdfUrl) {
+                if (! $pdfUrl) {
                     return response()->json(['error' => 'Credit report not found for this search'], 422);
                 }
                 $pdfResponse = Http::timeout(30)->get($pdfUrl);
-                if (!$pdfResponse->successful()) {
+                if (! $pdfResponse->successful()) {
                     return response()->json(['error' => 'Failed to download credit report'], 500);
                 }
                 // Save the PDF to storage
                 Storage::makeDirectory('cibil_reports');
-                $filename = 'cibil_report_' . $mobile . '_' . now()->format('Ymd_His') . '.pdf';
+                $filename = 'cibil_report_'.$mobile.'_'.now()->format('Ymd_His').'.pdf';
                 $filePath = "cibil_reports/{$filename}";
                 Storage::put($filePath, $pdfResponse->body());
 
@@ -972,6 +972,7 @@ $number = $raw;
             return $this->handleException($e);
         }
     }
+
     private function deductUserCreditsForPdf($pdfContent, float $deduction, $filename)
     {
         $user = auth()->user();
@@ -982,7 +983,7 @@ $number = $raw;
 
             return response($pdfContent, 200, [
                 'Content-Type' => 'application/pdf',
-                'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+                'Content-Disposition' => 'attachment; filename="'.$filename.'"',
                 'X-Remaining-Credits' => $user->credits,
             ]);
         } else {
@@ -996,18 +997,19 @@ $number = $raw;
     private function handleCorporateCin($data)
     {
         $cin = $data['id_number'] ?? null;
-        if (!$cin) {
+        if (! $cin) {
             return response()->json(['error' => 'CIN is required'], 400);
         }
         $cin = strtoupper(trim($cin));
 
         try {
             $response = Http::withHeaders([
-                'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
+                'Authorization' => 'Bearer '.env('SUREPASS_KYC_TOKEN'),
                 'Content-Type' => 'application/json',
             ])->timeout(30)->post(env('CORPORATE_CIN_URL'), [
-                        'id_number' => $cin,
-                    ]);
+                'id_number' => $cin,
+            ]);
+
             return $this->deductUserCredits($response, env('CORPORATE_CIN_COST'));
 
             // return $this->handleSurepassResponse($response);
@@ -1019,21 +1021,22 @@ $number = $raw;
     private function handleGstIntel($data)
     {
         $gst = $data['id_number'] ?? null;
-        if (!$gst) {
+        if (! $gst) {
             return response()->json(['error' => 'GST number is required'], 400);
         }
         $gst = strtoupper(trim($gst));
-        if (!preg_match('/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}[Z]{1}[0-9A-Z]{1}$/', $gst)) {
+        if (! preg_match('/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}[Z]{1}[0-9A-Z]{1}$/', $gst)) {
             return response()->json(['error' => 'Invalid GST number format'], 400);
         }
 
         try {
             $response = Http::withHeaders([
-                'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
+                'Authorization' => 'Bearer '.env('SUREPASS_KYC_TOKEN'),
                 'Content-Type' => 'application/json',
             ])->timeout(30)->post(env('GST_INTEL_URL'), [
-                        'id_number' => $gst,
-                    ]);
+                'id_number' => $gst,
+            ]);
+
             return $this->deductUserCredits($response, env('GST_INTEL_COST'));
 
             // return $this->handleSurepassResponse($response);
@@ -1045,18 +1048,19 @@ $number = $raw;
     private function handleEmploymentHistory($data)
     {
         $idNumber = $data['id_number'] ?? null;
-        if (!$idNumber) {
+        if (! $idNumber) {
             return response()->json(['error' => 'ID number is required'], 400);
         }
         $idNumber = strtoupper(trim($idNumber));
 
         try {
             $response = Http::withHeaders([
-                'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
+                'Authorization' => 'Bearer '.env('SUREPASS_KYC_TOKEN'),
                 'Content-Type' => 'application/json',
             ])->timeout(30)->post(env('EMPLOYMENT_HISTORY_URL'), [
-                        'id_number' => $idNumber,
-                    ]);
+                'id_number' => $idNumber,
+            ]);
+
             return $this->deductUserCredits($response, env('EMPLOYEMENT_HISTORY'));
 
             // return $this->handleSurepassResponse($response);
@@ -1074,11 +1078,12 @@ $number = $raw;
 
         try {
             $response = Http::withHeaders([
-                'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
+                'Authorization' => 'Bearer '.env('SUREPASS_KYC_TOKEN'),
                 'Content-Type' => 'application/json',
             ])->timeout(30)->post(env('FIND_UAN_URL'), [
-                        'mobile_number' => $mobile,
-                    ]);
+                'mobile_number' => $mobile,
+            ]);
+
             return $this->deductUserCredits($response, env('FINDUAN_COST'));
 
             // return $this->handleSurepassResponse($response);
@@ -1090,17 +1095,18 @@ $number = $raw;
     private function handlePanToUan($data)
     {
         $pan = strtoupper(trim($data['pan_number'] ?? ''));
-        if (!preg_match('/^[A-Z]{5}[0-9]{4}[A-Z]$/', $pan)) {
+        if (! preg_match('/^[A-Z]{5}[0-9]{4}[A-Z]$/', $pan)) {
             return response()->json(['error' => 'Invalid PAN number format'], 400);
         }
 
         try {
             $response = Http::withHeaders([
-                'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
+                'Authorization' => 'Bearer '.env('SUREPASS_KYC_TOKEN'),
                 'Content-Type' => 'application/json',
             ])->timeout(30)->post(env('PAN_TO_UAN_URL'), [
-                        'pan_number' => $pan,
-                    ]);
+                'pan_number' => $pan,
+            ]);
+
             return $this->deductUserCredits($response, env('PAN_TO_UAN_COST'));
 
             // return $this->handleSurepassResponse($response);
@@ -1112,17 +1118,18 @@ $number = $raw;
     private function handlePanToGstin($data)
     {
         $pan = strtoupper(trim($data['pan_number'] ?? ''));
-        if (!preg_match('/^[A-Z]{5}[0-9]{4}[A-Z]$/', $pan)) {
+        if (! preg_match('/^[A-Z]{5}[0-9]{4}[A-Z]$/', $pan)) {
             return response()->json(['error' => 'Invalid PAN number format'], 400);
         }
 
         try {
             $response = Http::withHeaders([
-                'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
+                'Authorization' => 'Bearer '.env('SUREPASS_KYC_TOKEN'),
                 'Content-Type' => 'application/json',
             ])->timeout(30)->post(env('PAN_TO_GSTIN_URL'), [
-                        'pan_number' => $pan,
-                    ]);
+                'pan_number' => $pan,
+            ]);
+
             return $this->deductUserCredits($response, env('PAN_TO_GSTIN_COST'));
         } catch (Exception $e) {
             return $this->handleException($e);
@@ -1132,17 +1139,18 @@ $number = $raw;
     private function handlePanToUdyam($data)
     {
         $pan = strtoupper(trim($data['pan_number'] ?? ''));
-        if (!preg_match('/^[A-Z]{5}[0-9]{4}[A-Z]$/', $pan)) {
+        if (! preg_match('/^[A-Z]{5}[0-9]{4}[A-Z]$/', $pan)) {
             return response()->json(['error' => 'Invalid PAN number format'], 400);
         }
 
         try {
             $response = Http::withHeaders([
-                'Authorization' => 'Bearer ' . env('SUREPASS_KYC_TOKEN'),
+                'Authorization' => 'Bearer '.env('SUREPASS_KYC_TOKEN'),
                 'Content-Type' => 'application/json',
             ])->timeout(30)->post(env('PAN_TO_UDYAM_URL'), [
-                        'pan_number' => $pan,
-                    ]);
+                'pan_number' => $pan,
+            ]);
+
             return $this->deductUserCredits($response, env('PAN_TO_UDYAM_COST'));
         } catch (Exception $e) {
             return $this->handleException($e);
@@ -1173,6 +1181,7 @@ $number = $raw;
 
         return $this->handleSurepassResponse($response); // fallback for non-200 responses
     }
+
     private function handleSurepassResponse($response)
     {
         if ($response->successful()) {
@@ -1200,6 +1209,7 @@ $number = $raw;
     private function handleException($e)
     {
         Log::error('Surepass Exception', ['message' => $e->getMessage()]);
+
         return response()->json([
             'error' => 'Server error',
             'message' => $e->getMessage(),
@@ -1246,8 +1256,9 @@ $number = $raw;
             'type' => 'verification',
             'ip_address' => $request->ip(),
         ]);
-        if (!$type || !$data) {
+        if (! $type || ! $data) {
             Log::error('Missing type or data in request');
+
             return response()->json(['error' => 'Invalid search request'], 400);
         }
 
@@ -1278,20 +1289,22 @@ $number = $raw;
         try {
             $clientId = env('CASHFREE_CLIENT_ID');
             $timestamp = time();
-            $data = $clientId . '.' . $timestamp;
+            $data = $clientId.'.'.$timestamp;
 
             $publicKeyPath = storage_path('app/cashfree_public_key.pem');
 
-            if (!file_exists($publicKeyPath)) {
+            if (! file_exists($publicKeyPath)) {
                 Log::error('Public key file not found');
+
                 return null;
             }
 
             $publicKeyContent = file_get_contents($publicKeyPath);
             $publicKey = openssl_pkey_get_public($publicKeyContent);
 
-            if (!$publicKey) {
+            if (! $publicKey) {
                 Log::error('Invalid public key format');
+
                 return null;
             }
 
@@ -1301,7 +1314,8 @@ $number = $raw;
 
             return null;
         } catch (Exception $e) {
-            Log::error('Signature generation failed: ' . $e->getMessage());
+            Log::error('Signature generation failed: '.$e->getMessage());
+
             return null;
         }
     }
@@ -1310,7 +1324,7 @@ $number = $raw;
     {
         $signature = $this->generateSignature();
 
-        if (!$signature) {
+        if (! $signature) {
             // If signature fails, you MUST whitelist IP
             Log::error('Signature generation failed - IP whitelisting required');
             throw new Exception('Authentication failed: Either whitelist IP or fix signature generation');
@@ -1323,6 +1337,7 @@ $number = $raw;
             'x-cf-signature' => $signature,
         ];
     }
+
     private function handleBankAccountVerification($data)
     {
 
@@ -1331,7 +1346,7 @@ $number = $raw;
         $name = $data['name'] ?? null;
         $phone = $data['phone'] ?? null;
 
-        if (!$accountNumber || !$ifsc) {
+        if (! $accountNumber || ! $ifsc) {
             return response()->json(['error' => 'Account number and IFSC are required'], 400);
         }
 
@@ -1339,19 +1354,17 @@ $number = $raw;
             'bank_account' => $accountNumber,
             'ifsc' => $ifsc,
         ];
-        if (!empty($name)) {
+        if (! empty($name)) {
             $payload['name'] = $name;
         }
-        if (!empty($phone)) {
+        if (! empty($phone)) {
             $payload['phone'] = $phone;
         }
-
 
         try {
             $response = Http::withHeaders($this->getHeaders())
                 ->timeout(30)
                 ->post(env('BANK_VERIFICATION_URL'), $payload);
-
 
             return $this->deductUserBankCredits($response, env('BANK_ACCOUNT_VERIFY_COST'));
             // if ($response->successful()) {
@@ -1369,14 +1382,16 @@ $number = $raw;
             // ], $response->status());
 
         } catch (Exception $e) {
-            Log::error('Bank verification error: ' . $e->getMessage());
+            Log::error('Bank verification error: '.$e->getMessage());
+
             return response()->json([
                 'success' => false,
                 'message' => 'Server error occurred',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
+
     private function deductUserBankCredits($response, float $deduction = 1.00)
     {
         if ($response->successful()) {
@@ -1407,35 +1422,34 @@ $number = $raw;
     private function handlePanVerification($data)
     {
         $pan = strtoupper(trim($data['pan'] ?? ''));
-        if (!preg_match('/^[A-Z]{5}[0-9]{4}[A-Z]$/', $pan)) {
+        if (! preg_match('/^[A-Z]{5}[0-9]{4}[A-Z]$/', $pan)) {
             Log::error('Invalid PAN format', ['pan' => $pan]);
+
             return response()->json(['error' => 'Invalid PAN number format'], 400);
         }
 
         $payload = [
             'pan' => $pan,
-            'verification_id' => 'PAN360_' . uniqid() . '_' . time(),
+            'verification_id' => 'PAN360_'.uniqid().'_'.time(),
         ];
 
-        if (!empty($data['name'])) {
+        if (! empty($data['name'])) {
             $payload['name'] = $data['name'];
         }
-
-
 
         try {
             $response = Http::withHeaders($this->getHeaders())
                 ->timeout(30)
                 ->post(env('PAN_VERIFICATION_URL'), $payload);
 
-
             return $this->deductUserVerifyCredits($response, env('PAN_VERIFY_COST'));
             // return $this->handleResponse($response);
         } catch (Exception $e) {
             Log::error('PAN360 verification exception', [
                 'message' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
+
             return $this->handleVerificationException($e);
         }
     }
@@ -1449,9 +1463,9 @@ $number = $raw;
 
         $payload = [
             'epic_number' => $voterId,
-            'verification_id' => 'VOTER_' . uniqid() . '_' . time(),
+            'verification_id' => 'VOTER_'.uniqid().'_'.time(),
         ];
-        if (!empty($data['name'])) {
+        if (! empty($data['name'])) {
             $payload['name'] = $data['name'];
         }
 
@@ -1459,6 +1473,7 @@ $number = $raw;
             $response = Http::withHeaders($this->getHeaders())
                 ->timeout(30)
                 ->post(env('VOTER_ID_VERIFICATION_URL'), $payload);
+
             return $this->deductUserVerifyCredits($response, env('VOTER_ID_VERIFY_COST'));
             // return $this->handleResponse($response);
         } catch (Exception $e) {
@@ -1469,18 +1484,18 @@ $number = $raw;
     private function handleEmploymentVerification($data)
     {
         $validCombos = [
-            ["phone"],
-            ["uan"],
-            ["phone", "pan"],
-            ["phone", "dob", "employer_name"],
-            ["phone", "employee_name", "employer_name"],
-            ["phone", "dob", "employee_name", "employer_name"],
-            ["phone", "pan", "employee_name", "employer_name"],
-            ["phone", "dob", "pan", "employee_name", "employer_name"],
-            ["uan", "employee_name", "employer_name"],
-            ["uan", "employee_name"],
-            ["dob", "employee_name"],
-            ["dob", "employee_name", "employer_name"],
+            ['phone'],
+            ['uan'],
+            ['phone', 'pan'],
+            ['phone', 'dob', 'employer_name'],
+            ['phone', 'employee_name', 'employer_name'],
+            ['phone', 'dob', 'employee_name', 'employer_name'],
+            ['phone', 'pan', 'employee_name', 'employer_name'],
+            ['phone', 'dob', 'pan', 'employee_name', 'employer_name'],
+            ['uan', 'employee_name', 'employer_name'],
+            ['uan', 'employee_name'],
+            ['dob', 'employee_name'],
+            ['dob', 'employee_name', 'employer_name'],
         ];
 
         $isValid = false;
@@ -1498,19 +1513,19 @@ $number = $raw;
             }
         }
 
-        if (!$isValid) {
+        if (! $isValid) {
             return response()->json([
-                'error' => 'Please fill all fields for at least one valid combination (e.g. phone + pan, uan + name, etc).'
+                'error' => 'Please fill all fields for at least one valid combination (e.g. phone + pan, uan + name, etc).',
             ], 400);
         }
 
         $payload = [];
         foreach (['phone', 'pan', 'uan', 'dob', 'employee_name', 'employer_name'] as $field) {
-            if (!empty($data[$field])) {
+            if (! empty($data[$field])) {
                 $payload[$field] = $data[$field];
             }
         }
-        $payload['verification_id'] = 'EMP_' . uniqid() . '_' . time();
+        $payload['verification_id'] = 'EMP_'.uniqid().'_'.time();
 
         if (count($payload) <= 1) { // Only verification_id
             return response()->json(['error' => 'At least one employment field is required'], 400);
@@ -1520,6 +1535,7 @@ $number = $raw;
             $response = Http::withHeaders($this->getHeaders())
                 ->timeout(30)
                 ->post(env('EMPLOYMENT_VERIFICATION_URL'), $payload);
+
             return $this->deductUserVerifyCredits($response, env('EMPLOYEMENT_VERIFY_COST'));
             // return $this->handleResponse($response);
         } catch (Exception $e) {
@@ -1534,14 +1550,12 @@ $number = $raw;
             return response()->json(['error' => 'Passport/File number and Date of Birth are required'], 400);
         }
 
-
         $payload = [
             'file_number' => $passportNumber,
             'dob' => $data['dob'],
             'name' => $data['name'] ?? null,
-            'verification_id' => 'PASS_' . uniqid() . '_' . time(),
+            'verification_id' => 'PASS_'.uniqid().'_'.time(),
         ];
-
 
         try {
             $response = Http::withHeaders($this->getHeaders())
@@ -1563,13 +1577,14 @@ $number = $raw;
 
         $payload = [
             'vehicle_number' => $rcNumber,
-            'verification_id' => 'VRC_' . uniqid() . '_' . time(),
+            'verification_id' => 'VRC_'.uniqid().'_'.time(),
         ];
 
         try {
             $response = Http::withHeaders($this->getHeaders())
                 ->timeout(30)
                 ->post(env('VEHICLE_RC_VERIFICATION_URL'), $payload);
+
             return $this->deductUserVerifyCredits($response, env('VEHICLERC_VERIFY_COST'));
             // return $this->handleResponse($response);
         } catch (Exception $e) {
@@ -1586,13 +1601,14 @@ $number = $raw;
 
         $payload = [
             'ifsc' => $ifscCode,
-            'verification_id' => 'IFSC_' . uniqid() . '_' . time(),
+            'verification_id' => 'IFSC_'.uniqid().'_'.time(),
         ];
 
         try {
             $response = Http::withHeaders($this->getHeaders())
                 ->timeout(30)
                 ->post(env('IFSC_VERIFICATION_URL'), $payload);
+
             return $this->deductUserVerifyCredits($response, env('IFSC_VERIFY_COST'));
             // return $this->handleResponse($response);
         } catch (Exception $e) {
@@ -1615,7 +1631,7 @@ $number = $raw;
 
         $payload = [
             'dl_number' => $licenseNumber,
-            'verification_id' => 'DL_' . uniqid() . '_' . time(),
+            'verification_id' => 'DL_'.uniqid().'_'.time(),
             'dob' => $dobFormatted,
         ];
 
@@ -1623,6 +1639,7 @@ $number = $raw;
             $response = Http::withHeaders($this->getHeaders())
                 ->timeout(30)
                 ->post(env('DRIVING_LICENSE_VERIFICATION_URL'), $payload);
+
             return $this->deductUserVerifyCredits($response, env('DRIVING_LICENSE_VERIFY_COST'));
             // return $this->handleResponse($response);
         } catch (Exception $e) {
@@ -1635,29 +1652,32 @@ $number = $raw;
         if ($response->successful()) {
             return response()->json([
                 'success' => true,
-                'data' => $response->json()
+                'data' => $response->json(),
             ]);
         }
 
         $data = $response->json();
+
         return response()->json([
             'success' => false,
             'message' => 'Verification failed',
             'error' => $data,
             'credits' => $data['credits'] ?? null,
-            'status' => $response->status()
+            'status' => $response->status(),
         ], $response->status());
     }
 
     private function handleVerificationException(Exception $e)
     {
-        Log::error('Verification error: ' . $e->getMessage());
+        Log::error('Verification error: '.$e->getMessage());
+
         return response()->json([
             'success' => false,
             'message' => 'Server error occurred',
-            'error' => $e->getMessage()
+            'error' => $e->getMessage(),
         ], 500);
     }
+
     private function deductUserVerifyCredits($response, float $deduction)
     {
         if ($response->successful()) {
@@ -1698,8 +1718,8 @@ $number = $raw;
         // Normalise phone: ensure leading +
         if ($type === 'phone') {
             $value = $this->sanitizePhoneNumber($value);
-            if (!str_starts_with($value, '+')) {
-                $value = '+' . $value;
+            if (! str_starts_with($value, '+')) {
+                $value = '+'.$value;
             }
         }
 
@@ -1714,14 +1734,15 @@ $number = $raw;
             $response = Http::withHeaders([
                 'X-API-Key' => env('FASTAPI_API_KEY'),
             ])->timeout(70)->asJson()->post(env('SIGNALHIRE_URL'), [
-                        'items' => [$value],
-                    ]);
+                'items' => [$value],
+            ]);
 
-            if (!$response->successful()) {
+            if (! $response->successful()) {
                 Log::warning('socialIntelSearch FastAPI error', [
                     'status' => $response->status(),
                     'body' => $response->body(),
                 ]);
+
                 return response()->json([
                     'error' => 'Search failed. Please try again.',
                 ], $response->status());
@@ -1747,6 +1768,7 @@ $number = $raw;
             ]);
         } catch (Exception $e) {
             Log::error('socialIntelSearch exception', ['message' => $e->getMessage()]);
+
             return response()->json(['error' => 'Something went wrong. Please try again.'], 500);
         }
     }

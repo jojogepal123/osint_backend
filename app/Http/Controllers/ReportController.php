@@ -2,25 +2,25 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\View;
 use Barryvdh\DomPDF\Facade\Pdf;
-use Illuminate\Support\Str;
+use Exception;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Facades\Http;
-use Exception;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\View;
+use Illuminate\Support\Str;
+
 class ReportController extends Controller
 {
-
     private function getImageBase64($url)
     {
         try {
             $imgData = file_get_contents($url);
             $type = pathinfo($url, PATHINFO_EXTENSION);
-            return 'data:image/' . $type . ';base64,' . base64_encode($imgData);
+
+            return 'data:image/'.$type.';base64,'.base64_encode($imgData);
         } catch (Exception $e) {
             return null;
         }
@@ -40,13 +40,13 @@ class ReportController extends Controller
 
         $userEmail = Auth::check() ? Auth::user()->email : 'N/A';
 
-        $filename = 'report_' . now()->format('Ymd_His') . '_' . Str::uuid() . '.pdf';
+        $filename = 'report_'.now()->format('Ymd_His').'_'.Str::uuid().'.pdf';
         $filePath = storage_path("app/private/reports/{$filename}");
 
         // Ensure directory exists
         Storage::makeDirectory('/reports');
 
-        $profileImages = data_get($data, "profile.profileImages", []);
+        $profileImages = data_get($data, 'profile.profileImages', []);
 
         if (is_array($profileImages)) {
 
@@ -55,12 +55,13 @@ class ReportController extends Controller
                 $source = $img['source'] ?? 'Unknown';
                 $url = $img['value'] ?? null;
 
-                if (!$url)
+                if (! $url) {
                     continue;
+                }
 
                 // Fix Telegram relative path
-                if ($source === "Telegram" && Str::startsWith($url, '/telegram_photos/')) {
-                    $url = rtrim(env('FRONTEND_URL'), '/') . $url;
+                if ($source === 'Telegram' && Str::startsWith($url, '/telegram_photos/')) {
+                    $url = rtrim(env('FRONTEND_URL'), '/').$url;
                 }
 
                 $base64 = $this->getImageBase64($url);
@@ -74,10 +75,10 @@ class ReportController extends Controller
         // Render view based on type
         if ($type === 'tel') {
             $html = View::make('report.tel_template', compact('data', 'userEmail'))->render();
-        } else if ($type === 'email') {
-            if (!empty($data['breachData'])) {
+        } elseif ($type === 'email') {
+            if (! empty($data['breachData'])) {
                 foreach ($data['breachData'] as $key => $value) {
-                    if (!empty($value['LogoPath'])) {
+                    if (! empty($value['LogoPath'])) {
                         $data['breachData'][$key]['LogoBase64'] = $this->getImageBase64($value['LogoPath']);
                     }
                 }
@@ -85,15 +86,18 @@ class ReportController extends Controller
             $html = View::make('report.email_template', compact('data', 'userEmail'))->render();
         } else {
             Log::error("Invalid report type: $type");
+
             return response()->json(['error' => 'Invalid type'], 422);
         }
 
         try {
             $pdf = Pdf::loadHTML($html);
             $pdf->save($filePath);
+
             return response()->download($filePath, $filename);
         } catch (Exception $e) {
-            Log::error("PDF generation failed: " . $e->getMessage());
+            Log::error('PDF generation failed: '.$e->getMessage());
+
             return response()->json(['error' => 'PDF generation failed'], 500);
         }
     }
@@ -115,18 +119,18 @@ class ReportController extends Controller
         $profileImages = data_get($results, 'profile.profileImages', []);
         $profileImagesForPdf = [];
 
-
         if (is_array($profileImages)) {
             foreach ($profileImages as $img) {
 
                 $platform = $img['source'] ?? 'Unknown';
                 $url = $img['value'] ?? null;
 
-                if (!$url)
+                if (! $url) {
                     continue;
+                }
 
                 if (Str::startsWith($url, '/')) {
-                    $url = rtrim(config('app.furl'), '/') . $url;
+                    $url = rtrim(config('app.furl'), '/').$url;
                 }
                 $base64 = $this->getImageBase64($url);
 
@@ -139,8 +143,6 @@ class ReportController extends Controller
                 }
             }
         }
-
-
 
         $prettyResults = json_encode($results, JSON_PRETTY_PRINT);
 
@@ -177,26 +179,26 @@ class ReportController extends Controller
         --- End Data ---
         EOT;
 
-
         // Step 3: Call Gemini API
         $response = Http::timeout(20)
             ->retry(3, 200)
             ->post(
-                'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' . env('GEMINI_API_KEY'),
+                'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key='.env('GEMINI_API_KEY'),
                 [
                     'contents' => [
                         [
-                            'parts' => [['text' => $prompt]]
-                        ]
-                    ]
+                            'parts' => [['text' => $prompt]],
+                        ],
+                    ],
                 ]
             );
 
-        if (!$response->successful()) {
-            Log::error("Gemini AI request failed", [
+        if (! $response->successful()) {
+            Log::error('Gemini AI request failed', [
                 'status' => $response->status(),
                 'body' => $response->body(),
             ]);
+
             return response()->json(['error' => 'Gemini AI failed to generate report.'], 500);
         }
 
@@ -240,12 +242,13 @@ class ReportController extends Controller
 
         // Log::info("PDF Images", $profileImagesForPdf);
 
-        $filename = 'ai-report-' . Str::slug($userInput) . '.pdf';
+        $filename = 'ai-report-'.Str::slug($userInput).'.pdf';
 
         return response($pdf->output(), 200)
             ->header('Content-Type', 'application/pdf')
             ->header('Content-Disposition', "attachment; filename={$filename}");
     }
+
     public function generateUpiReport(Request $request)
     {
         $validated = $request->validate([
@@ -256,17 +259,21 @@ class ReportController extends Controller
 
         $data = array_filter($validated['data'], function ($value, $key) {
             $key = strtolower($key);
-            if (in_array($key, ['client_id', 'clientid']))
+            if (in_array($key, ['client_id', 'clientid'])) {
                 return false;
-            if (is_null($value) || $value === '')
+            }
+            if (is_null($value) || $value === '') {
                 return false;
-            if (!is_scalar($value))
+            }
+            if (! is_scalar($value)) {
                 return true;
+            }
             $v = strtolower(trim((string) $value));
-            return !in_array($v, ['n/a', 'na', 'n.a']);
+
+            return ! in_array($v, ['n/a', 'na', 'n.a']);
         }, ARRAY_FILTER_USE_BOTH);
 
-        $filename = 'upi_details_' . now()->format('Ymd_His') . '_' . Str::uuid() . '.pdf';
+        $filename = 'upi_details_'.now()->format('Ymd_His').'_'.Str::uuid().'.pdf';
         $filePath = storage_path("app/private/reports/{$filename}");
         \Storage::makeDirectory('private/reports');
 
@@ -276,12 +283,15 @@ class ReportController extends Controller
                 'userEmail' => $userEmail,
             ])->render();
             Pdf::loadHTML($html)->save($filePath);
+
             return response()->download($filePath, $filename);
         } catch (Exception $e) {
-            Log::error("UPI PDF generation error: " . $e->getMessage());
+            Log::error('UPI PDF generation error: '.$e->getMessage());
+
             return response()->json(['error' => 'PDF generation failed'], 500);
         }
     }
+
     public function generateRcReport(Request $request)
     {
         $validated = $request->validate([
@@ -291,17 +301,21 @@ class ReportController extends Controller
 
         $data = array_filter($validated['data'], function ($value, $key) {
             $key = strtolower($key);
-            if (in_array($key, ['client_id', 'clientid']))
+            if (in_array($key, ['client_id', 'clientid'])) {
                 return false;
-            if (is_null($value) || $value === '')
+            }
+            if (is_null($value) || $value === '') {
                 return false;
-            if (!is_scalar($value))
-                return true; // keep arrays/objects as-is
+            }
+            if (! is_scalar($value)) {
+                return true;
+            } // keep arrays/objects as-is
             $v = strtolower(trim((string) $value));
-            return !in_array($v, ['n/a', 'na', 'n.a']);
+
+            return ! in_array($v, ['n/a', 'na', 'n.a']);
         }, ARRAY_FILTER_USE_BOTH);
 
-        $filename = 'rc_details_' . now()->format('Ymd_His') . '_' . Str::uuid() . '.pdf';
+        $filename = 'rc_details_'.now()->format('Ymd_His').'_'.Str::uuid().'.pdf';
         $filePath = storage_path("app/private/reports/{$filename}");
         Storage::makeDirectory('private/reports');
 
@@ -311,15 +325,17 @@ class ReportController extends Controller
                 'userEmail' => $userEmail,
             ])->render();
             Pdf::loadHTML($html)->save($filePath);
+
             return response()->download($filePath, $filename);
         } catch (Exception $e) {
-            Log::error("RC PDF generation error: " . $e->getMessage());
+            Log::error('RC PDF generation error: '.$e->getMessage());
+
             return response()->json(['error' => 'PDF generation failed'], 500);
         }
     }
+
     public function generateChallanReport(Request $request)
     {
-
 
         $validated = $request->validate([
             'data' => ['required', 'array'],
@@ -330,18 +346,22 @@ class ReportController extends Controller
         // Fix: Properly handle nested arrays like challan_details
         $data = array_filter($validated['data'], function ($value, $key) {
             $key = strtolower($key);
-            if (in_array($key, ['client_id', 'clientid']))
+            if (in_array($key, ['client_id', 'clientid'])) {
                 return false;
-            if (is_null($value) || $value === '')
+            }
+            if (is_null($value) || $value === '') {
                 return false;
+            }
             if (is_scalar($value)) {
                 $v = strtolower(trim((string) $value));
-                return !in_array($v, ['n/a', 'na', 'n.a']);
+
+                return ! in_array($v, ['n/a', 'na', 'n.a']);
             }
+
             return true; // Keep arrays like challan_details
         }, ARRAY_FILTER_USE_BOTH);
 
-        $filename = 'challan_details_' . now()->format('Ymd_His') . '_' . Str::uuid() . '.pdf';
+        $filename = 'challan_details_'.now()->format('Ymd_His').'_'.Str::uuid().'.pdf';
         $filePath = storage_path("app/private/reports/{$filename}");
         Storage::makeDirectory('private/reports');
 
@@ -351,9 +371,11 @@ class ReportController extends Controller
                 'userEmail' => $userEmail,
             ])->render();
             Pdf::loadHTML($html)->save($filePath);
+
             return response()->download($filePath, $filename);
         } catch (Exception $e) {
-            Log::error("Challan PDF generation error: " . $e->getMessage());
+            Log::error('Challan PDF generation error: '.$e->getMessage());
+
             return response()->json(['error' => 'PDF generation failed'], 500);
         }
     }
@@ -361,42 +383,48 @@ class ReportController extends Controller
     public function generateVerificationReport(Request $request)
     {
         $validated = $request->validate([
-            'data'        => ['required', 'array'],
-            'title'       => ['sometimes', 'string'],
+            'data' => ['required', 'array'],
+            'title' => ['sometimes', 'string'],
             'searchInput' => ['sometimes', 'string'],
         ]);
 
-        $userEmail   = Auth::check() ? Auth::user()->email : 'N/A';
-        $title       = $validated['title']       ?? 'Verification';
+        $userEmail = Auth::check() ? Auth::user()->email : 'N/A';
+        $title = $validated['title'] ?? 'Verification';
         $searchInput = $validated['searchInput'] ?? '';
 
         $data = array_filter($validated['data'], function ($value, $key) {
-            if (in_array(strtolower($key), ['client_id', 'clientid', 'verification_id']))
+            if (in_array(strtolower($key), ['client_id', 'clientid', 'verification_id'])) {
                 return false;
-            if (is_null($value) || $value === '')
+            }
+            if (is_null($value) || $value === '') {
                 return false;
+            }
             if (is_scalar($value)) {
                 $v = strtolower(trim((string) $value));
-                return !in_array($v, ['n/a', 'na', 'n.a']);
+
+                return ! in_array($v, ['n/a', 'na', 'n.a']);
             }
+
             return true;
         }, ARRAY_FILTER_USE_BOTH);
 
-        $filename = 'verification_' . now()->format('Ymd_His') . '_' . Str::uuid() . '.pdf';
+        $filename = 'verification_'.now()->format('Ymd_His').'_'.Str::uuid().'.pdf';
         $filePath = storage_path("app/private/reports/{$filename}");
         Storage::makeDirectory('private/reports');
 
         try {
             $html = View::make('report.verification_template', [
-                'data'        => $data,
-                'title'       => $title,
+                'data' => $data,
+                'title' => $title,
                 'searchInput' => $searchInput,
-                'userEmail'   => $userEmail,
+                'userEmail' => $userEmail,
             ])->render();
             Pdf::loadHTML($html)->save($filePath);
+
             return response()->download($filePath, $filename);
         } catch (Exception $e) {
-            Log::error("Verification PDF generation error: " . $e->getMessage());
+            Log::error('Verification PDF generation error: '.$e->getMessage());
+
             return response()->json(['error' => 'PDF generation failed'], 500);
         }
     }
@@ -419,21 +447,22 @@ class ReportController extends Controller
             }
         }
 
-        $filename = 'social_intel_' . Str::slug($data['fullName'] ?? 'profile') . '_' . now()->format('Ymd_His') . '.pdf';
+        $filename = 'social_intel_'.Str::slug($data['fullName'] ?? 'profile').'_'.now()->format('Ymd_His').'.pdf';
         $filePath = storage_path("app/private/reports/{$filename}");
         Storage::makeDirectory('private/reports');
 
         try {
             $html = View::make('report.social_template', [
-                'data'      => $data,
+                'data' => $data,
                 'userEmail' => $userEmail,
             ])->render();
             Pdf::loadHTML($html)->save($filePath);
+
             return response()->download($filePath, $filename);
         } catch (Exception $e) {
-            Log::error("Social Intel PDF error: " . $e->getMessage());
+            Log::error('Social Intel PDF error: '.$e->getMessage());
+
             return response()->json(['error' => 'PDF generation failed'], 500);
         }
     }
-
 }

@@ -35,6 +35,7 @@ class ExpireSanctumToken
                     ]);
 
                     $accessToken->delete(); // revoke expired token
+
                     return response()->json(['message' => 'Token expired'], 401);
                 }
             } else {

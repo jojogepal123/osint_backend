@@ -12,6 +12,7 @@ class SearchQuery extends Model
         'user_id',
         'ip_address',
     ];
+
     public function user()
     {
         return $this->belongsTo(\App\Models\User::class);

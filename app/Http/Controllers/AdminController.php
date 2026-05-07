@@ -156,13 +156,48 @@ class AdminController extends Controller
             'is_admin' => 'sometimes|boolean',
         ]);
 
+        $wasAdmin = $user->is_admin;
+
         // Prevent admin from revoking their own admin access
         if (isset($validated['is_admin']) && ! $validated['is_admin'] && $user->id === auth()->id()) {
-            return response()->json(['error' => 'You cannot revoke your own admin access.'], 422);
+            // Allow update but don't change is_admin, just warn
+            $user->update(['name' => $validated['name'] ?? $user->name, 'credits' => $validated['credits'] ?? $user->credits, 'app_mode' => $validated['app_mode'] ?? $user->app_mode]);
+
+            $this->auditLog('SELF_REVOKE_PREVENTED', [
+                'target_id' => $user->id,
+                'target_email' => $user->email,
+            ]);
+
+            return response()->json([
+                'message' => 'User updated.',
+                'warning' => 'You cannot revoke your own admin access.',
+                'user' => $user->only(self::USER_FIELDS),
+            ]);
         }
 
+        $wasAdmin = $user->is_admin;
         $before = $user->only(array_keys($validated));
         $user->update($validated);
+
+        $adminChange = null;
+        if (array_key_exists('is_admin', $validated)) {
+            $allApiIds = ApiEngine::all()->pluck('id')->toArray();
+            $currentPerms = $user->apiEngines->pluck('id')->toArray();
+
+            if ($validated['is_admin']) {
+                $adminChange = [
+                    'action' => 'grant',
+                    'permissions_count' => count($allApiIds),
+                    'current_permissions' => count($currentPerms),
+                ];
+            } elseif ($wasAdmin && $user->id !== auth()->id()) {
+                $adminChange = [
+                    'action' => 'revoke',
+                    'permissions_count' => count($currentPerms),
+                    'current_permissions' => count($currentPerms),
+                ];
+            }
+        }
 
         $this->auditLog('USER_UPDATED', [
             'target_id' => $user->id,
@@ -171,7 +206,45 @@ class AdminController extends Controller
             'after' => $validated,
         ]);
 
-        return response()->json(['message' => 'User updated.', 'user' => $user->only(self::USER_FIELDS)]);
+        return response()->json([
+            'message' => 'User updated.',
+            'user' => $user->only(self::USER_FIELDS),
+            'admin_change' => $adminChange,
+        ]);
+    }
+
+    // ── Sync Admin Permissions ───────────────────────────────────────────────
+    public function syncAdminPermissions(Request $request, $id)
+    {
+        abort_unless(is_numeric($id), 400, 'Invalid user ID.');
+
+        $user = User::findOrFail((int) $id);
+
+        $validated = $request->validate([
+            'action' => 'required|in:grant,revoke',
+        ]);
+
+        $allApiIds = ApiEngine::all()->pluck('id')->toArray();
+
+        if ($validated['action'] === 'grant') {
+            $user->apiEngines()->sync($allApiIds);
+
+            $this->auditLog('ADMIN_ROLE_GRANTED', [
+                'target_id' => $user->id,
+                'target_email' => $user->email,
+                'permissions_granted' => count($allApiIds),
+            ]);
+        } else {
+            $user->apiEngines()->sync([]);
+
+            $this->auditLog('ADMIN_ROLE_REVOKED', [
+                'target_id' => $user->id,
+                'target_email' => $user->email,
+                'permissions_revoked' => $user->apiEngines()->count(),
+            ]);
+        }
+
+        return response()->json(['message' => 'Permissions synced.']);
     }
 
     // ── Delete User ─────────────────────────────────────────────────────────

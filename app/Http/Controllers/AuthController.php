@@ -2,25 +2,24 @@
 
 namespace App\Http\Controllers;
 
+use App\Mail\SendOtpMail;
+use App\Models\User;
+use App\Models\UserIp;
 use Exception;
 use Illuminate\Http\Request;
-use App\Models\User;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
-use Illuminate\Support\Facades\Mail;
-use App\Mail\SendOtpMail;
-use Illuminate\Support\Facades\Log;
-use App\Models\UserIp;
 
 class AuthController extends Controller
 {
-
     public function register(Request $request)
     {
-        if (!config('auth.registration_enabled')) {
+        if (! config('auth.registration_enabled')) {
             return response()->json([
-                'message' => 'Registration is currently disabled.'
+                'message' => 'Registration is currently disabled.',
             ], 403);
         }
 
@@ -43,7 +42,7 @@ class AuthController extends Controller
 
         return response()->json([
             'user' => $user,
-            'message' => 'Registration successful. Please Login to continue.'
+            'message' => 'Registration successful. Please Login to continue.',
         ], 201);
     }
 
@@ -56,7 +55,7 @@ class AuthController extends Controller
 
         $user = User::where('email', $request->email)->first();
 
-        if (!$user || !Hash::check($request->password, (string) $user->password)) {
+        if (! $user || ! Hash::check($request->password, (string) $user->password)) {
             throw ValidationException::withMessages([
                 'email' => ['Invalid credentials.'],
             ]);
@@ -66,18 +65,18 @@ class AuthController extends Controller
         $isNewDevice = $deviceId && $deviceId !== $user->last_device_id;
         $otpOlderThan12h = ($user->last_otp_verified_at?->diffInHours(now()) ?? 13) >= 12;
 
-        if (!$user->email_verified_at || $otpOlderThan12h || $isNewDevice) {
+        if (! $user->email_verified_at || $otpOlderThan12h || $isNewDevice) {
             // Always send new OTP if device is new OR OTP expired
             $otp = rand(100000, 999999);
             $user->otp = $otp;
-            Log::info("Otp is sent {$user->email}: " . $otp);
+            Log::info("Otp is sent {$user->email}: ".$otp);
             $user->otp_expires_at = now()->addMinutes(5);
             $user->save();
 
             try {
                 Mail::to($user->email)->send(new SendOtpMail($otp));
             } catch (Exception $e) {
-                Log::error("Error sending OTP to {$user->email}: " . $e->getMessage());
+                Log::error("Error sending OTP to {$user->email}: ".$e->getMessage());
             }
 
             return response()->json([
@@ -129,11 +128,11 @@ class AuthController extends Controller
         try {
             Mail::to($user->email)->send(new SendOtpMail($otp));
         } catch (Exception $e) {
-            Log::error("Error resending OTP to {$user->email}: " . $e->getMessage());
+            Log::error("Error resending OTP to {$user->email}: ".$e->getMessage());
         }
 
         return response()->json([
-            'message' => 'OTP resent to ' . $request->email,
+            'message' => 'OTP resent to '.$request->email,
             'otp_expires_at' => $user->otp_expires_at,
         ]);
     }
@@ -147,11 +146,11 @@ class AuthController extends Controller
 
         $user = User::where('email', $request->email)->first();
 
-        if (!$user) {
+        if (! $user) {
             return response()->json(['message' => 'User not found'], 404);
         }
 
-        if (!$user->otp || $user->otp !== $request->otp) {
+        if (! $user->otp || $user->otp !== $request->otp) {
             return response()->json(['message' => 'Invalid OTP'], 422);
         }
 
@@ -182,5 +181,4 @@ class AuthController extends Controller
             'expires_at' => now()->addMinutes(60)->toISOString(),
         ]);
     }
-
 }
