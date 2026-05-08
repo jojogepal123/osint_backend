@@ -4,6 +4,8 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
@@ -25,6 +27,9 @@ class User extends Authenticatable
         'app_mode',
         'credits',
         'is_admin',
+        'cms_role',
+        'team_id',
+        'active_case_id',
         'otp',
         'otp_expires_at',
     ];
@@ -68,5 +73,34 @@ class User extends Authenticatable
     public function apiEngines()
     {
         return $this->belongsToMany(ApiEngine::class, 'user_api_permissions');
+    }
+
+    public function team(): BelongsTo
+    {
+        return $this->belongsTo(Team::class, 'team_id');
+    }
+
+    public function activeCase(): BelongsTo
+    {
+        return $this->belongsTo(CaseModel::class, 'active_case_id');
+    }
+
+    public function assignedCases(): HasMany
+    {
+        return $this->hasMany(CaseModel::class, 'assigned_to');
+    }
+
+    public function createdCases(): HasMany
+    {
+        return $this->hasMany(CaseModel::class, 'user_id');
+    }
+
+    public function getCmsRoleAttribute($value): string
+    {
+        if ($this->is_admin) {
+            return 'supervisor';
+        }
+
+        return $value ?? 'auditor';
     }
 }

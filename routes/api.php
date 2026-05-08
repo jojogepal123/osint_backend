@@ -5,8 +5,11 @@ use App\Http\Controllers\ApiServiceController;
 use App\Http\Controllers\Auth\EmailVerificationNotificationController;
 use App\Http\Controllers\Auth\VerifyEmailController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\CaseController;
 use App\Http\Controllers\GoogleAuthController;
 use App\Http\Controllers\ReportController;
+use App\Http\Controllers\TeamController;
+use App\Http\Controllers\UserController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -82,3 +85,33 @@ Route::get('/registration-status', function () {
 
 // googlelogin route
 Route::post('/google-login', [GoogleAuthController::class, 'googleLogin']);
+
+// CMS CASE ROUTES
+Route::middleware(['auth:sanctum', 'token.expire'])->prefix('cases')->group(function () {
+    Route::get('/', [CaseController::class, 'index']);
+    Route::post('/', [CaseController::class, 'store']);
+    Route::get('/{case}', [CaseController::class, 'show']);
+    Route::put('/{case}', [CaseController::class, 'update']);
+    Route::delete('/{case}', [CaseController::class, 'destroy']);
+    Route::put('/{case}/status', [CaseController::class, 'updateStatus']);
+    Route::put('/{case}/assign', [CaseController::class, 'assign']);
+});
+
+// USER ACTIVE CASE ROUTES
+Route::middleware(['auth:sanctum', 'token.expire'])->prefix('user')->group(function () {
+    Route::get('/active-case', [UserController::class, 'getActiveCase']);
+    Route::put('/set-active-case', [UserController::class, 'setActiveCase']);
+    Route::delete('/active-case', [UserController::class, 'clearActiveCase']);
+    Route::put('/cms-role', [UserController::class, 'updateCmsRole']);
+});
+
+// CMS TEAM ROUTES
+Route::middleware(['auth:sanctum', 'token.expire'])->prefix('teams')->group(function () {
+    Route::get('/', [TeamController::class, 'index']);
+    Route::post('/', [TeamController::class, 'store']);
+    Route::get('/{team}', [TeamController::class, 'show']);
+    Route::put('/{team}', [TeamController::class, 'update']);
+    Route::delete('/{team}', [TeamController::class, 'destroy']);
+    Route::post('/{team}/members', [TeamController::class, 'addMember']);
+    Route::delete('/{team}/members/{user}', [TeamController::class, 'removeMember']);
+});
