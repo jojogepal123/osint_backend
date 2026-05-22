@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreCaseRequest;
 use App\Http\Requests\UpdateCaseRequest;
+use App\Models\CaseActivity;
 use App\Models\CaseModel;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -13,16 +14,27 @@ class CaseController extends Controller
     private function getCasesForUser(User $user)
     {
         if ($user->is_admin) {
-            return CaseModel::with(['user', 'assignedUser', 'team']);
+            return CaseModel::with(['user', 'assignedUsers']);
         }
 
-        if ($user->cms_role === 'supervisor' && $user->team_id) {
-            return CaseModel::with(['user', 'assignedUser', 'team'])
-                ->where('team_id', $user->team_id);
+        return CaseModel::with(['user', 'assignedUsers'])
+            ->where(function ($query) use ($user) {
+                $query->where('user_id', $user->id)
+                    ->orWhereRelation('assignedUsers', 'user_id', $user->id);
+            });
+    }
+
+    private function isCaseMember(User $user, CaseModel $case): bool
+    {
+        if ($user->id === $case->user_id) {
+            return true;
         }
 
-        return CaseModel::with(['user', 'assignedUser', 'team'])
-            ->where('user_id', $user->id);
+        if ($user->is_admin) {
+            return true;
+        }
+
+        return $case->assignedUsers()->where('user_id', $user->id)->exists();
     }
 
     public function index(Request $request)
@@ -57,7 +69,7 @@ class CaseController extends Controller
     {
         $user = $request->user();
 
-        if ($user->cms_role !== 'supervisor' && ! $user->is_admin) {
+        if (! $user->canCreateCase()) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
@@ -75,10 +87,25 @@ class CaseController extends Controller
             'priority' => $request->priority ?? 'medium',
             'category' => $request->category,
             'team_id' => $request->team_id,
-            'assigned_to' => $request->assigned_to,
+            'assigned_to' => $request->assigned_to ?? null,
         ]);
 
-        $case->load(['user', 'assignedUser', 'team']);
+        if ($request->has('assigned_to') && is_array($request->assigned_to)) {
+            $filtered = array_filter($request->assigned_to, fn ($id) => (int) $id > 0);
+            if (! empty($filtered)) {
+                $case->assignedUsers()->sync(array_values($filtered));
+            }
+        }
+
+        $case->load(['user', 'assignedUsers']);
+
+        CaseActivity::log(
+            $case->id,
+            $user->id,
+            'created',
+            "Case created with title: {$case->title}",
+            ['title' => $case->title, 'priority' => $case->priority]
+        );
 
         return response()->json([
             'message' => 'Case created successfully',
@@ -91,19 +118,13 @@ class CaseController extends Controller
         $user = $request->user();
 
         if ($user->is_admin) {
-            $case->load(['user', 'assignedUser', 'team']);
+            $case->load(['user', 'assignedUsers']);
 
             return response()->json($case);
         }
 
-        if ($user->cms_role === 'supervisor' && $user->team_id && $case->team_id === $user->team_id) {
-            $case->load(['user', 'assignedUser', 'team']);
-
-            return response()->json($case);
-        }
-
-        if ($case->user_id === $user->id || $case->assigned_to === $user->id) {
-            $case->load(['user', 'assignedUser', 'team']);
+        if ($this->isCaseMember($user, $case)) {
+            $case->load(['user', 'assignedUsers']);
 
             return response()->json($case);
         }
@@ -115,16 +136,20 @@ class CaseController extends Controller
     {
         $user = $request->user();
 
-        if ($user->cms_role !== 'supervisor' && ! $user->is_admin) {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
-
-        if ($user->cms_role === 'supervisor' && $user->team_id && $case->team_id !== $user->team_id) {
+        if (! $user->canEditCase()) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
         $case->update($request->validated());
-        $case->load(['user', 'assignedUser', 'team']);
+        $case->load(['user', 'assignedUsers']);
+
+        CaseActivity::log(
+            $case->id,
+            $user->id,
+            'updated',
+            'Case details updated',
+            ['changes' => $request->validated()]
+        );
 
         return response()->json([
             'message' => 'Case updated successfully',
@@ -140,12 +165,11 @@ class CaseController extends Controller
 
         $user = $request->user();
 
-        if ($case->user_id !== $user->id && $case->assigned_to !== $user->id && ! $user->is_admin) {
-            if ($user->cms_role === 'supervisor' && $user->team_id && $case->team_id !== $user->team_id) {
-                return response()->json(['message' => 'Unauthorized'], 403);
-            }
+        if (! $this->isCaseMember($user, $case)) {
+            return response()->json(['message' => 'Unauthorized'], 403);
         }
 
+        $oldStatus = $case->status;
         $case->status = $request->status;
 
         if ($request->status === 'resolved') {
@@ -155,7 +179,15 @@ class CaseController extends Controller
         }
 
         $case->save();
-        $case->load(['user', 'assignedUser', 'team']);
+        $case->load(['user', 'assignedUsers']);
+
+        CaseActivity::log(
+            $case->id,
+            $user->id,
+            'status_changed',
+            "Status changed from {$oldStatus} to {$request->status}",
+            ['old_status' => $oldStatus, 'new_status' => $request->status]
+        );
 
         return response()->json([
             'message' => 'Case status updated',
@@ -163,31 +195,93 @@ class CaseController extends Controller
         ]);
     }
 
-    public function assign(Request $request, CaseModel $case)
+    public function assignUsers(Request $request, CaseModel $case)
     {
         $request->validate([
-            'assigned_to' => 'required|exists:users,id',
-            'team_id' => 'nullable|exists:teams,id',
+            'user_ids' => 'required|array',
+            'user_ids.*' => 'integer|exists:users,id',
         ]);
 
         $user = $request->user();
 
-        if ($user->cms_role !== 'supervisor' && ! $user->is_admin) {
+        if (! $user->canAssignCase()) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        if ($user->cms_role === 'supervisor' && $user->team_id) {
-            if ($case->team_id !== $user->team_id) {
-                return response()->json(['message' => 'Unauthorized'], 403);
-            }
+        $case->assignedUsers()->sync(array_values(array_filter($request->user_ids, fn ($id) => (int) $id > 0)));
+
+        $case->load(['user', 'assignedUsers']);
+
+        $assignedNames = $case->assignedUsers->pluck('name')->toArray();
+        CaseActivity::log(
+            $case->id,
+            $user->id,
+            'assigned',
+            'Case assigned to: '.implode(', ', $assignedNames),
+            ['user_ids' => $request->user_ids]
+        );
+
+        return response()->json([
+            'message' => 'Case assigned successfully',
+            'case' => $case,
+        ]);
+    }
+
+    public function removeMember(Request $request, CaseModel $case, int $userId)
+    {
+        $user = $request->user();
+
+        if (! $user->canAssignCase()) {
+            return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        $case->assigned_to = $request->assigned_to;
-        if ($request->has('team_id')) {
-            $case->team_id = $request->team_id;
+        $case->assignedUsers()->detach($userId);
+        $case->load(['user', 'assignedUsers']);
+
+        CaseActivity::log(
+            $case->id,
+            $user->id,
+            'unassigned',
+            'User removed from case',
+            ['removed_user_id' => $userId]
+        );
+
+        return response()->json([
+            'message' => 'Member removed',
+            'case' => $case,
+        ]);
+    }
+
+    public function members(CaseModel $case)
+    {
+        return response()->json($case->assignedUsers);
+    }
+
+    public function assign(Request $request, CaseModel $case)
+    {
+        $request->validate([
+            'assigned_to' => 'required|exists:users,id',
+        ]);
+
+        $user = $request->user();
+
+        if (! $user->canAssignCase()) {
+            return response()->json(['message' => 'Unauthorized'], 403);
         }
+
+        $case->assignedUsers()->sync([$request->assigned_to]);
+        $case->assigned_to = $request->assigned_to;
         $case->save();
-        $case->load(['user', 'assignedUser', 'team']);
+        $case->load(['user', 'assignedUsers']);
+
+        $assignedUser = User::find($request->assigned_to);
+        CaseActivity::log(
+            $case->id,
+            $user->id,
+            'assigned',
+            "Case assigned to {$assignedUser->name}",
+            ['assigned_to' => $request->assigned_to]
+        );
 
         return response()->json([
             'message' => 'Case assigned successfully',
@@ -199,16 +293,53 @@ class CaseController extends Controller
     {
         $user = $request->user();
 
-        if ($user->cms_role !== 'supervisor' && ! $user->is_admin) {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
-
-        if ($user->cms_role === 'supervisor' && $user->team_id && $case->team_id !== $user->team_id) {
+        if (! $user->canDeleteCase()) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
         $case->delete();
 
+        CaseActivity::log(
+            $case->id,
+            $user->id,
+            'deleted',
+            'Case deleted'
+        );
+
         return response()->json(['message' => 'Case deleted successfully']);
+    }
+
+    public function activities(Request $request, CaseModel $case)
+    {
+        $user = $request->user();
+
+        if ($user->is_admin) {
+            $activities = $case->activities()->with('user')->orderBy('created_at', 'desc')->get();
+
+            return response()->json($activities);
+        }
+
+        if ($this->isCaseMember($user, $case)) {
+            $activities = $case->activities()->with('user')->orderBy('created_at', 'desc')->get();
+
+            return response()->json($activities);
+        }
+
+        return response()->json(['message' => 'Unauthorized'], 403);
+    }
+
+    public function searches(Request $request, CaseModel $case)
+    {
+        $user = $request->user();
+
+        if ($user->is_admin) {
+            return response()->json($case->searchQueries()->with(['user', 'result'])->orderBy('created_at', 'desc')->get());
+        }
+
+        if ($this->isCaseMember($user, $case)) {
+            return response()->json($case->searchQueries()->with(['user', 'result'])->orderBy('created_at', 'desc')->get());
+        }
+
+        return response()->json(['message' => 'Unauthorized'], 403);
     }
 }

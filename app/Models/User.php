@@ -75,19 +75,15 @@ class User extends Authenticatable
         return $this->belongsToMany(ApiEngine::class, 'user_api_permissions');
     }
 
-    public function team(): BelongsTo
+    public function assignedCases(): BelongsToMany
     {
-        return $this->belongsTo(Team::class, 'team_id');
+        return $this->belongsToMany(CaseModel::class, 'case_assignments')
+            ->withTimestamps();
     }
 
     public function activeCase(): BelongsTo
     {
         return $this->belongsTo(CaseModel::class, 'active_case_id');
-    }
-
-    public function assignedCases(): HasMany
-    {
-        return $this->hasMany(CaseModel::class, 'assigned_to');
     }
 
     public function createdCases(): HasMany
@@ -102,5 +98,35 @@ class User extends Authenticatable
         }
 
         return $value ?? 'auditor';
+    }
+
+    public function canCreateCase(): bool
+    {
+        return $this->cms_role === 'supervisor' || $this->is_admin;
+    }
+
+    public function canEditCase(): bool
+    {
+        return $this->cms_role === 'supervisor' || $this->is_admin;
+    }
+
+    public function canDeleteCase(): bool
+    {
+        return $this->cms_role === 'supervisor' || $this->is_admin;
+    }
+
+    public function canAssignCase(): bool
+    {
+        return $this->cms_role === 'supervisor' || $this->is_admin;
+    }
+
+    public function canManageTeams(): bool
+    {
+        return $this->cms_role === 'supervisor' || $this->is_admin;
+    }
+
+    public function canViewAllCases(): bool
+    {
+        return $this->cms_role === 'supervisor' || $this->is_admin;
     }
 }

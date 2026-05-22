@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 // use Google\Service\Storage;
 use App\Models\SearchQuery;
+use App\Models\SearchResult;
 use Exception;
 use HlrLookup\HLRLookupClient;
 use Illuminate\Http\Client\ConnectionException;
@@ -22,6 +23,32 @@ class ApiServiceController extends Controller
     private function sanitizePhoneNumber($number)
     {
         return preg_replace('/\D/', '', $number);
+    }
+
+    private function getActiveCaseId(): ?int
+    {
+        $user = auth()->user();
+
+        return $user->active_case_id ?? null;
+    }
+
+    private function logSearchQuery(string $query, string $type): ?SearchQuery
+    {
+        return SearchQuery::create([
+            'user_id' => auth()->id(),
+            'query' => $query,
+            'type' => $type,
+            'ip_address' => request()->ip(),
+            'case_id' => $this->getActiveCaseId(),
+        ]);
+    }
+
+    private function saveSearchResult(SearchQuery $searchQuery, array $results): void
+    {
+        SearchResult::create([
+            'search_query_id' => $searchQuery->id,
+            'results' => $results,
+        ]);
     }
 
     private function checkApiPermission(array $requestedSlugs): array
@@ -85,15 +112,7 @@ class ApiServiceController extends Controller
 
     public function getTelData(Request $request)
     {
-        // Make sure this request itself is allowed to run longer than 60s (if needed)
-        // ini_set('max_execution_time', '180'); // 180 seconds
-        // set_time_limit(180);                  // some SAPIs respect this better
-        // Log::info('PHP max_execution_time', [
-        //     'value' => ini_get('max_execution_time'),
-        // ]);
         $user = auth()->user();
-
-        /* Save phone search query */
 
         try {
             $request->validate([
@@ -107,21 +126,9 @@ class ApiServiceController extends Controller
 
             $phoneUtil = PhoneNumberUtil::getInstance();
 
-            $number = $raw;
-
-            $user = auth()->user();
-
-            SearchQuery::create([
-                'user_id' => $user->id,
-                'query' => $number,
-                'type' => 'phone',
-                'ip_address' => $request->ip(),
-            ]);
             try {
-                // parse with null region so numbers starting with country code are understood
                 $proto = $phoneUtil->parse($raw, 'IN');
 
-                // Validate
                 if (! $phoneUtil->isValidNumber($proto)) {
                     Log::warning('libphonenumber: invalid number', ['raw' => $raw]);
 
@@ -139,6 +146,8 @@ class ApiServiceController extends Controller
             }
 
             $number = $raw;
+            $searchQuery = $this->logSearchQuery($number, 'phone');
+
             $user = auth()->user();
             $urls = [
                 'osint' => env('OSINTDATA_URL'),
@@ -368,10 +377,16 @@ class ApiServiceController extends Controller
 
             // Log::info($data);
 
-            return response()->json([
+            $responseData = [
                 ...$data,
                 'credits' => $user->credits,
-            ]);
+            ];
+
+            if (isset($searchQuery)) {
+                $responseData['search_query_id'] = $searchQuery->id;
+            }
+
+            return response()->json($responseData);
         } catch (Exception $e) {
             Log::error('Global Phone API Error (Caught outside API calls)', [
                 'number' => $request->query('phone'),
@@ -391,14 +406,9 @@ class ApiServiceController extends Controller
             ]);
 
             $email = $request->query('email');
-            $user = auth()->user();
+            $searchQuery = $this->logSearchQuery($email, 'email');
 
-            SearchQuery::create([
-                'user_id' => $user->id,
-                'query' => $email,
-                'type' => 'email',
-                'ip_address' => $request->ip(),
-            ]);
+            $user = auth()->user();
 
             $encodedEmail = urlencode($email);
             $user = auth()->user();
@@ -518,10 +528,16 @@ class ApiServiceController extends Controller
 
             Log::info($data);
 
-            return response()->json([
+            $responseData = [
                 'data' => $data,
                 'credits' => $user->credits,
-            ]);
+            ];
+
+            if (isset($searchQuery)) {
+                $responseData['search_query_id'] = $searchQuery->id;
+            }
+
+            return response()->json($responseData);
         } catch (Exception $e) {
             Log::error('Global Email API Error', [
                 'email' => $request->query('email'),
@@ -539,7 +555,6 @@ class ApiServiceController extends Controller
         ]);
 
         $upiId = $request->input('upi_id');
-
         $user = auth()->user();
 
         $permittedSlugs = $this->checkApiPermission(['upi_full']);
@@ -551,12 +566,7 @@ class ApiServiceController extends Controller
             ]);
         }
 
-        SearchQuery::create([
-            'user_id' => $user->id,
-            'query' => $upiId,
-            'type' => 'upi',
-            'ip_address' => $request->ip(),
-        ]);
+        $searchQuery = $this->logSearchQuery($upiId, 'upi');
         try {
             $response = Http::withHeaders([
                 'Authorization' => 'Bearer '.env('SUREPASS_KYC_TOKEN'),
@@ -573,6 +583,10 @@ class ApiServiceController extends Controller
                 if ($user->credits >= $deduction) {
                     $user->credits -= $deduction;
                     $user->save();
+
+                    if ($searchQuery) {
+                        $this->saveSearchResult($searchQuery, $data);
+                    }
 
                     return response()->json([
                         'data' => $data,
@@ -619,14 +633,7 @@ class ApiServiceController extends Controller
             ]);
         }
 
-        // ✅ Store search query + IP
-        SearchQuery::create([
-            'user_id' => $user->id,
-            'query' => $idNumber,
-            'type' => 'vehicle',
-            'ip_address' => $request->ip(),
-        ]);
-
+        $searchQuery = $this->logSearchQuery($idNumber, 'vehicle');
         try {
             $response = Http::withHeaders([
                 'Authorization' => 'Bearer '.env('SUREPASS_KYC_TOKEN'),
@@ -643,6 +650,10 @@ class ApiServiceController extends Controller
                 if ($user->credits >= $deduction) {
                     $user->credits -= $deduction;
                     $user->save();
+
+                    if ($searchQuery) {
+                        $this->saveSearchResult($searchQuery, $data);
+                    }
 
                     return response()->json([
                         'data' => $data,
@@ -689,14 +700,7 @@ class ApiServiceController extends Controller
             ]);
         }
 
-        // ✅ Store search query + IP
-        SearchQuery::create([
-            'user_id' => $user->id,
-            'query' => $rcNumber,
-            'type' => 'challan',
-            'ip_address' => $request->ip(),
-        ]);
-
+        $searchQuery = $this->logSearchQuery($rcNumber, 'challan');
         try {
             $response = Http::withHeaders([
                 'Authorization' => 'Bearer '.env('SUREPASS_KYC_TOKEN'),
@@ -711,6 +715,10 @@ class ApiServiceController extends Controller
                 if ($user->credits >= 7) {
                     $user->credits -= env('RC_CHALLAN_COST');
                     $user->save();
+
+                    if ($searchQuery) {
+                        $this->saveSearchResult($searchQuery, $response->json());
+                    }
                 } else {
                     return response()->json([
                         'message' => 'Insufficient credits',
@@ -760,12 +768,7 @@ class ApiServiceController extends Controller
             ]);
         }
 
-        SearchQuery::create([
-            'user_id' => $user->id,
-            'query' => json_encode($data),
-            'type' => 'leak',
-            'ip_address' => $request->ip(),
-        ]);
+        $searchQuery = $this->logSearchQuery(json_encode($data), 'leak');
 
         $params = [
             'page' => $page,
@@ -802,6 +805,10 @@ class ApiServiceController extends Controller
                     if ($user->credits >= $deduction) {
                         $user->credits -= $deduction;
                         $user->save();
+
+                        if ($searchQuery) {
+                            $this->saveSearchResult($searchQuery, $data);
+                        }
                     } else {
                         return response()->json([
                             'message' => 'Insufficient credits.',
@@ -862,39 +869,33 @@ class ApiServiceController extends Controller
             }
         }
 
-        $user = auth()->user();
-        SearchQuery::create([
-            'user_id' => $user->id,
-            'query' => json_encode($data),
-            'type' => 'corporate',
-            'ip_address' => $request->ip(),
-        ]);
+        $searchQuery = $this->logSearchQuery(json_encode($data), 'corporate');
 
         switch ($type) {
             case 'corporate_gstin':
-                return $this->handleCorporateGstin($data);
+                return $this->handleCorporateGstin($data, $searchQuery);
             case 'credit_report':
-                return $this->handleCreditReport($data);
+                return $this->handleCreditReport($data, $searchQuery);
             case 'corporate_cin':
-                return $this->handleCorporateCin($data);
+                return $this->handleCorporateCin($data, $searchQuery);
             case 'gst_intel':
-                return $this->handleGstIntel($data);
+                return $this->handleGstIntel($data, $searchQuery);
             case 'employment_history':
-                return $this->handleEmploymentHistory($data);
+                return $this->handleEmploymentHistory($data, $searchQuery);
             case 'find_uan':
-                return $this->handleFindUan($data);
+                return $this->handleFindUan($data, $searchQuery);
             case 'pan_to_uan':
-                return $this->handlePanToUan($data);
+                return $this->handlePanToUan($data, $searchQuery);
             case 'pan_to_gstin':
-                return $this->handlePanToGstin($data);
+                return $this->handlePanToGstin($data, $searchQuery);
             case 'pan_to_udyam':
-                return $this->handlePanToUdyam($data);
+                return $this->handlePanToUdyam($data, $searchQuery);
             default:
                 return response()->json(['error' => 'Invalid search request'], 400);
         }
     }
 
-    private function handleCorporateGstin($data)
+    private function handleCorporateGstin($data, $searchQuery = null)
     {
         $idNumber = $data['id_number'] ?? null;
         if (! $idNumber) {
@@ -913,7 +914,7 @@ class ApiServiceController extends Controller
                 'id_number' => $idNumber,
             ]);
 
-            return $this->deductUserCredits($response, env('CORPORATE_GSTIN_COST'));
+            return $this->deductUserCredits($response, env('CORPORATE_GSTIN_COST'), $searchQuery);
 
             // return $this->handleSurepassResponse($response);
         } catch (Exception $e) {
@@ -921,7 +922,7 @@ class ApiServiceController extends Controller
         }
     }
 
-    private function handleCreditReport($data)
+    private function handleCreditReport($data, $searchQuery = null)
     {
         $required = ['mobile', 'pan', 'name', 'gender', 'consent'];
         $mobile = $data['mobile'];
@@ -994,7 +995,7 @@ class ApiServiceController extends Controller
         }
     }
 
-    private function handleCorporateCin($data)
+    private function handleCorporateCin($data, $searchQuery = null)
     {
         $cin = $data['id_number'] ?? null;
         if (! $cin) {
@@ -1010,7 +1011,7 @@ class ApiServiceController extends Controller
                 'id_number' => $cin,
             ]);
 
-            return $this->deductUserCredits($response, env('CORPORATE_CIN_COST'));
+            return $this->deductUserCredits($response, env('CORPORATE_CIN_COST'), $searchQuery);
 
             // return $this->handleSurepassResponse($response);
         } catch (Exception $e) {
@@ -1018,7 +1019,7 @@ class ApiServiceController extends Controller
         }
     }
 
-    private function handleGstIntel($data)
+    private function handleGstIntel($data, $searchQuery = null)
     {
         $gst = $data['id_number'] ?? null;
         if (! $gst) {
@@ -1037,7 +1038,7 @@ class ApiServiceController extends Controller
                 'id_number' => $gst,
             ]);
 
-            return $this->deductUserCredits($response, env('GST_INTEL_COST'));
+            return $this->deductUserCredits($response, env('GST_INTEL_COST'), $searchQuery);
 
             // return $this->handleSurepassResponse($response);
         } catch (Exception $e) {
@@ -1045,7 +1046,7 @@ class ApiServiceController extends Controller
         }
     }
 
-    private function handleEmploymentHistory($data)
+    private function handleEmploymentHistory($data, $searchQuery = null)
     {
         $idNumber = $data['id_number'] ?? null;
         if (! $idNumber) {
@@ -1061,7 +1062,7 @@ class ApiServiceController extends Controller
                 'id_number' => $idNumber,
             ]);
 
-            return $this->deductUserCredits($response, env('EMPLOYEMENT_HISTORY'));
+            return $this->deductUserCredits($response, env('EMPLOYEMENT_HISTORY'), $searchQuery);
 
             // return $this->handleSurepassResponse($response);
         } catch (Exception $e) {
@@ -1069,7 +1070,7 @@ class ApiServiceController extends Controller
         }
     }
 
-    private function handleFindUan($data)
+    private function handleFindUan($data, $searchQuery = null)
     {
         $mobile = $this->sanitizePhoneNumber($data['mobile_number'] ?? '');
         if (strlen($mobile) < 10 || strlen($mobile) > 15) {
@@ -1084,7 +1085,7 @@ class ApiServiceController extends Controller
                 'mobile_number' => $mobile,
             ]);
 
-            return $this->deductUserCredits($response, env('FINDUAN_COST'));
+            return $this->deductUserCredits($response, env('FINDUAN_COST'), $searchQuery);
 
             // return $this->handleSurepassResponse($response);
         } catch (Exception $e) {
@@ -1092,7 +1093,7 @@ class ApiServiceController extends Controller
         }
     }
 
-    private function handlePanToUan($data)
+    private function handlePanToUan($data, $searchQuery = null)
     {
         $pan = strtoupper(trim($data['pan_number'] ?? ''));
         if (! preg_match('/^[A-Z]{5}[0-9]{4}[A-Z]$/', $pan)) {
@@ -1107,7 +1108,7 @@ class ApiServiceController extends Controller
                 'pan_number' => $pan,
             ]);
 
-            return $this->deductUserCredits($response, env('PAN_TO_UAN_COST'));
+            return $this->deductUserCredits($response, env('PAN_TO_UAN_COST'), $searchQuery);
 
             // return $this->handleSurepassResponse($response);
         } catch (Exception $e) {
@@ -1115,7 +1116,7 @@ class ApiServiceController extends Controller
         }
     }
 
-    private function handlePanToGstin($data)
+    private function handlePanToGstin($data, $searchQuery = null)
     {
         $pan = strtoupper(trim($data['pan_number'] ?? ''));
         if (! preg_match('/^[A-Z]{5}[0-9]{4}[A-Z]$/', $pan)) {
@@ -1130,13 +1131,13 @@ class ApiServiceController extends Controller
                 'pan_number' => $pan,
             ]);
 
-            return $this->deductUserCredits($response, env('PAN_TO_GSTIN_COST'));
+            return $this->deductUserCredits($response, env('PAN_TO_GSTIN_COST'), $searchQuery);
         } catch (Exception $e) {
             return $this->handleException($e);
         }
     }
 
-    private function handlePanToUdyam($data)
+    private function handlePanToUdyam($data, $searchQuery = null)
     {
         $pan = strtoupper(trim($data['pan_number'] ?? ''));
         if (! preg_match('/^[A-Z]{5}[0-9]{4}[A-Z]$/', $pan)) {
@@ -1151,13 +1152,13 @@ class ApiServiceController extends Controller
                 'pan_number' => $pan,
             ]);
 
-            return $this->deductUserCredits($response, env('PAN_TO_UDYAM_COST'));
+            return $this->deductUserCredits($response, env('PAN_TO_UDYAM_COST'), $searchQuery);
         } catch (Exception $e) {
             return $this->handleException($e);
         }
     }
 
-    private function deductUserCredits($response, float $deduction)
+    private function deductUserCredits($response, float $deduction, $searchQuery = null)
     {
         if ($response->successful()) {
             $data = $response->json();
@@ -1166,6 +1167,10 @@ class ApiServiceController extends Controller
             if ($user && $user->credits >= $deduction) {
                 $user->credits -= $deduction;
                 $user->save();
+
+                if ($searchQuery) {
+                    $this->saveSearchResult($searchQuery, $data);
+                }
 
                 return response()->json([
                     'data' => $data,
@@ -1250,12 +1255,7 @@ class ApiServiceController extends Controller
             }
         }
 
-        SearchQuery::create([
-            'user_id' => $user->id,
-            'query' => json_encode($data),
-            'type' => 'verification',
-            'ip_address' => $request->ip(),
-        ]);
+        $searchQuery = $this->logSearchQuery(json_encode($data), 'verification');
         if (! $type || ! $data) {
             Log::error('Missing type or data in request');
 
@@ -1264,21 +1264,21 @@ class ApiServiceController extends Controller
 
         switch ($type) {
             case 'pan':
-                return $this->handlePanVerification($data);
+                return $this->handlePanVerification($data, $searchQuery);
             case 'voter_id':
-                return $this->handleVoterIdVerification($data);
+                return $this->handleVoterIdVerification($data, $searchQuery);
             case 'employment':
-                return $this->handleEmploymentVerification($data);
+                return $this->handleEmploymentVerification($data, $searchQuery);
             case 'bank_account':
-                return $this->handleBankAccountVerification($data);
+                return $this->handleBankAccountVerification($data, $searchQuery);
             case 'passport':
-                return $this->handlePassportVerification($data);
+                return $this->handlePassportVerification($data, $searchQuery);
             case 'vehicle_rc':
-                return $this->handleVehicleRcVerification($data);
+                return $this->handleVehicleRcVerification($data, $searchQuery);
             case 'ifsc':
-                return $this->handleIfscVerification($data);
+                return $this->handleIfscVerification($data, $searchQuery);
             case 'driving_license':
-                return $this->handleDrivingLicenseVerification($data);
+                return $this->handleDrivingLicenseVerification($data, $searchQuery);
             default:
                 return response()->json(['error' => 'Invalid verification type'], 400);
         }
@@ -1338,7 +1338,7 @@ class ApiServiceController extends Controller
         ];
     }
 
-    private function handleBankAccountVerification($data)
+    private function handleBankAccountVerification($data, $searchQuery = null)
     {
 
         $accountNumber = $data['account_number'] ?? null;
@@ -1366,7 +1366,7 @@ class ApiServiceController extends Controller
                 ->timeout(30)
                 ->post(env('BANK_VERIFICATION_URL'), $payload);
 
-            return $this->deductUserBankCredits($response, env('BANK_ACCOUNT_VERIFY_COST'));
+            return $this->deductUserBankCredits($response, env('BANK_ACCOUNT_VERIFY_COST'), $searchQuery);
             // if ($response->successful()) {
             //     return response()->json([
             //         'success' => true,
@@ -1392,7 +1392,7 @@ class ApiServiceController extends Controller
         }
     }
 
-    private function deductUserBankCredits($response, float $deduction = 1.00)
+    private function deductUserBankCredits($response, float $deduction = 1.00, $searchQuery = null)
     {
         if ($response->successful()) {
             $data = $response->json();
@@ -1401,6 +1401,10 @@ class ApiServiceController extends Controller
             if ($user && $user->credits >= $deduction) {
                 $user->credits -= $deduction;
                 $user->save();
+
+                if ($searchQuery) {
+                    $this->saveSearchResult($searchQuery, $data);
+                }
 
                 return response()->json([
                     'success' => true,
@@ -1419,7 +1423,7 @@ class ApiServiceController extends Controller
         return $this->handleResponse($response); // fallback
     }
 
-    private function handlePanVerification($data)
+    private function handlePanVerification($data, $searchQuery = null)
     {
         $pan = strtoupper(trim($data['pan'] ?? ''));
         if (! preg_match('/^[A-Z]{5}[0-9]{4}[A-Z]$/', $pan)) {
@@ -1442,7 +1446,7 @@ class ApiServiceController extends Controller
                 ->timeout(30)
                 ->post(env('PAN_VERIFICATION_URL'), $payload);
 
-            return $this->deductUserVerifyCredits($response, env('PAN_VERIFY_COST'));
+            return $this->deductUserVerifyCredits($response, env('PAN_VERIFY_COST'), $searchQuery);
             // return $this->handleResponse($response);
         } catch (Exception $e) {
             Log::error('PAN360 verification exception', [
@@ -1454,7 +1458,7 @@ class ApiServiceController extends Controller
         }
     }
 
-    private function handleVoterIdVerification($data)
+    private function handleVoterIdVerification($data, $searchQuery = null)
     {
         $voterId = strtoupper(trim($data['epic_number'] ?? ''));
         if (empty($voterId)) {
@@ -1474,14 +1478,14 @@ class ApiServiceController extends Controller
                 ->timeout(30)
                 ->post(env('VOTER_ID_VERIFICATION_URL'), $payload);
 
-            return $this->deductUserVerifyCredits($response, env('VOTER_ID_VERIFY_COST'));
+            return $this->deductUserVerifyCredits($response, env('VOTER_ID_VERIFY_COST'), $searchQuery);
             // return $this->handleResponse($response);
         } catch (Exception $e) {
             return $this->handleVerificationException($e);
         }
     }
 
-    private function handleEmploymentVerification($data)
+    private function handleEmploymentVerification($data, $searchQuery = null)
     {
         $validCombos = [
             ['phone'],
@@ -1536,14 +1540,14 @@ class ApiServiceController extends Controller
                 ->timeout(30)
                 ->post(env('EMPLOYMENT_VERIFICATION_URL'), $payload);
 
-            return $this->deductUserVerifyCredits($response, env('EMPLOYEMENT_VERIFY_COST'));
+            return $this->deductUserVerifyCredits($response, env('EMPLOYEMENT_VERIFY_COST'), $searchQuery);
             // return $this->handleResponse($response);
         } catch (Exception $e) {
             return $this->handleVerificationException($e);
         }
     }
 
-    private function handlePassportVerification($data)
+    private function handlePassportVerification($data, $searchQuery = null)
     {
         $passportNumber = strtoupper(trim($data['file_number'] ?? ''));
         if (empty($passportNumber) || empty($data['dob'])) {
@@ -1562,13 +1566,13 @@ class ApiServiceController extends Controller
                 ->timeout(30)
                 ->post(env('PASSPORT_VERIFICATION_URL'), $payload);
 
-            return $this->deductUserVerifyCredits($response, env('PASSPORT_VERIFY_COST'));
+            return $this->deductUserVerifyCredits($response, env('PASSPORT_VERIFY_COST'), $searchQuery);
         } catch (Exception $e) {
             return $this->handleVerificationException($e);
         }
     }
 
-    private function handleVehicleRcVerification($data)
+    private function handleVehicleRcVerification($data, $searchQuery = null)
     {
         $rcNumber = strtoupper(trim($data['vehicle_number'] ?? ''));
         if (empty($rcNumber)) {
@@ -1585,14 +1589,14 @@ class ApiServiceController extends Controller
                 ->timeout(30)
                 ->post(env('VEHICLE_RC_VERIFICATION_URL'), $payload);
 
-            return $this->deductUserVerifyCredits($response, env('VEHICLERC_VERIFY_COST'));
+            return $this->deductUserVerifyCredits($response, env('VEHICLERC_VERIFY_COST'), $searchQuery);
             // return $this->handleResponse($response);
         } catch (Exception $e) {
             return $this->handleVerificationException($e);
         }
     }
 
-    private function handleIfscVerification($data)
+    private function handleIfscVerification($data, $searchQuery = null)
     {
         $ifscCode = strtoupper(trim($data['ifsc'] ?? ''));
         if (empty($ifscCode)) {
@@ -1609,14 +1613,14 @@ class ApiServiceController extends Controller
                 ->timeout(30)
                 ->post(env('IFSC_VERIFICATION_URL'), $payload);
 
-            return $this->deductUserVerifyCredits($response, env('IFSC_VERIFY_COST'));
+            return $this->deductUserVerifyCredits($response, env('IFSC_VERIFY_COST'), $searchQuery);
             // return $this->handleResponse($response);
         } catch (Exception $e) {
             return $this->handleVerificationException($e);
         }
     }
 
-    private function handleDrivingLicenseVerification($data)
+    private function handleDrivingLicenseVerification($data, $searchQuery = null)
     {
         $licenseNumber = strtoupper(trim($data['dl_number'] ?? ''));
         $dob = $data['dob'];
@@ -1640,7 +1644,7 @@ class ApiServiceController extends Controller
                 ->timeout(30)
                 ->post(env('DRIVING_LICENSE_VERIFICATION_URL'), $payload);
 
-            return $this->deductUserVerifyCredits($response, env('DRIVING_LICENSE_VERIFY_COST'));
+            return $this->deductUserVerifyCredits($response, env('DRIVING_LICENSE_VERIFY_COST'), $searchQuery);
             // return $this->handleResponse($response);
         } catch (Exception $e) {
             return $this->handleVerificationException($e);
@@ -1678,7 +1682,7 @@ class ApiServiceController extends Controller
         ], 500);
     }
 
-    private function deductUserVerifyCredits($response, float $deduction)
+    private function deductUserVerifyCredits($response, float $deduction, $searchQuery = null)
     {
         if ($response->successful()) {
             $data = $response->json();
@@ -1687,6 +1691,10 @@ class ApiServiceController extends Controller
             if ($user && $user->credits >= $deduction) {
                 $user->credits -= $deduction;
                 $user->save();
+
+                if ($searchQuery) {
+                    $this->saveSearchResult($searchQuery, $data);
+                }
 
                 return response()->json([
                     'success' => true,
@@ -1723,12 +1731,7 @@ class ApiServiceController extends Controller
             }
         }
 
-        SearchQuery::create([
-            'user_id' => $user->id,
-            'query' => $value,
-            'type' => 'social',
-            'ip_address' => $request->ip(),
-        ]);
+        $searchQuery = $this->logSearchQuery($value, 'social');
 
         try {
             $response = Http::withHeaders([
@@ -1755,6 +1758,10 @@ class ApiServiceController extends Controller
             if ($user->credits >= $deduction) {
                 $user->credits -= $deduction;
                 $user->save();
+
+                if ($searchQuery) {
+                    $this->saveSearchResult($searchQuery, $json);
+                }
             } else {
                 return response()->json([
                     'message' => 'Insufficient credits.',

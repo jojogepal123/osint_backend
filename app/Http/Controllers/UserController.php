@@ -35,7 +35,7 @@ class UserController extends Controller
         if ($user->is_admin) {
             $user->active_case_id = $request->case_id;
             $user->save();
-            $case->load(['user', 'assignedUser', 'team']);
+            $case->load(['user', 'assignedUsers']);
 
             return response()->json([
                 'message' => 'Active case set successfully',
@@ -43,19 +43,16 @@ class UserController extends Controller
             ]);
         }
 
-        if ($user->cms_role === 'supervisor' && $user->team_id) {
-            if ($case->team_id !== $user->team_id) {
-                return response()->json(['message' => 'Unauthorized'], 403);
-            }
-        }
+        $isOwner = $case->user_id === $user->id;
+        $isAssigned = $case->assignedUsers()->where('user_id', $user->id)->exists();
 
-        if ($case->user_id !== $user->id && $case->assigned_to !== $user->id) {
+        if (! $isOwner && ! $isAssigned) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
         $user->active_case_id = $request->case_id;
         $user->save();
-        $case->load(['user', 'assignedUser', 'team']);
+        $case->load(['user', 'assignedUsers']);
 
         return response()->json([
             'message' => 'Active case set successfully',
@@ -78,45 +75,22 @@ class UserController extends Controller
     {
         $request->validate([
             'user_id' => 'required|exists:users,id',
-            'cms_role' => 'required|in:auditor,supervisor',
-            'team_id' => 'nullable|exists:teams,id',
+            'cms_role' => 'required|in:auditor,supervisor,investigator',
         ]);
 
         $currentUser = $request->user();
 
-        if (! $currentUser->is_admin && $currentUser->cms_role !== 'supervisor') {
+        if (! $currentUser->is_admin) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
         $targetUser = \App\Models\User::find($request->user_id);
+        $targetUser->cms_role = $request->cms_role;
+        $targetUser->save();
 
-        if ($currentUser->is_admin) {
-            $targetUser->cms_role = $request->cms_role;
-            if ($request->has('team_id')) {
-                $targetUser->team_id = $request->team_id;
-            }
-            $targetUser->save();
-
-            return response()->json([
-                'message' => 'User CMS role updated successfully',
-                'user' => $targetUser,
-            ]);
-        }
-
-        if ($currentUser->cms_role === 'supervisor' && $currentUser->team_id) {
-            if ($request->cms_role === 'supervisor') {
-                return response()->json(['message' => 'Cannot assign supervisor role'], 403);
-            }
-            $targetUser->cms_role = $request->cms_role;
-            $targetUser->team_id = $currentUser->team_id;
-            $targetUser->save();
-
-            return response()->json([
-                'message' => 'User CMS role updated successfully',
-                'user' => $targetUser,
-            ]);
-        }
-
-        return response()->json(['message' => 'Unauthorized'], 403);
+        return response()->json([
+            'message' => 'User CMS role updated successfully',
+            'user' => $targetUser,
+        ]);
     }
 }

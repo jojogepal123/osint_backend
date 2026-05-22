@@ -15,7 +15,7 @@ class AdminController extends Controller
     private const VALID_TYPES = ['phone', 'email', 'vehicle', 'challan', 'corporate', 'social', 'verification', 'leak', 'upi'];
 
     // Fields returned in user listings (never expose otp, password, remember_token)
-    private const USER_FIELDS = ['id', 'name', 'email', 'app_mode', 'credits', 'is_admin', 'email_verified_at', 'created_at', 'updated_at'];
+    private const USER_FIELDS = ['id', 'name', 'email', 'app_mode', 'credits', 'is_admin', 'cms_role', 'email_verified_at', 'created_at', 'updated_at'];
 
     private function auditLog(string $action, array $context = []): void
     {
@@ -125,6 +125,7 @@ class AdminController extends Controller
             'credits' => 'sometimes|numeric|min:0|max:999999',
             'app_mode' => 'sometimes|in:trial,live',
             'is_admin' => 'sometimes|boolean',
+            'cms_role' => 'sometimes|in:auditor,investigator,supervisor',
         ]);
 
         $user = User::create([
@@ -135,6 +136,7 @@ class AdminController extends Controller
             'credits' => $validated['credits'] ?? 0,
             'app_mode' => $validated['app_mode'] ?? 'live',
             'is_admin' => $validated['is_admin'] ?? false,
+            'cms_role' => $validated['cms_role'] ?? 'auditor',
         ]);
 
         $this->auditLog('USER_CREATED', ['target_id' => $user->id, 'target_email' => $user->email]);
@@ -280,7 +282,7 @@ class AdminController extends Controller
             'page' => 'sometimes|integer|min:1|max:1000',
         ]);
 
-        $query = SearchQuery::with('user:id,name,email')->latest();
+        $query = SearchQuery::with(['user:id,name,email', 'result'])->latest();
 
         if ($search = $request->query('search')) {
             $query->where('query', 'like', "%{$search}%");

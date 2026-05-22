@@ -8,7 +8,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CaseController;
 use App\Http\Controllers\GoogleAuthController;
 use App\Http\Controllers\ReportController;
-use App\Http\Controllers\TeamController;
+use App\Http\Controllers\SearchResultController;
 use App\Http\Controllers\UserController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -95,6 +95,11 @@ Route::middleware(['auth:sanctum', 'token.expire'])->prefix('cases')->group(func
     Route::delete('/{case}', [CaseController::class, 'destroy']);
     Route::put('/{case}/status', [CaseController::class, 'updateStatus']);
     Route::put('/{case}/assign', [CaseController::class, 'assign']);
+    Route::put('/{case}/members', [CaseController::class, 'assignUsers']);
+    Route::get('/{case}/members', [CaseController::class, 'members']);
+    Route::delete('/{case}/members/{user}', [CaseController::class, 'removeMember']);
+    Route::get('/{case}/activities', [CaseController::class, 'activities']);
+    Route::get('/{case}/searches', [CaseController::class, 'searches']);
 });
 
 // USER ACTIVE CASE ROUTES
@@ -105,13 +110,10 @@ Route::middleware(['auth:sanctum', 'token.expire'])->prefix('user')->group(funct
     Route::put('/cms-role', [UserController::class, 'updateCmsRole']);
 });
 
-// CMS TEAM ROUTES
-Route::middleware(['auth:sanctum', 'token.expire'])->prefix('teams')->group(function () {
-    Route::get('/', [TeamController::class, 'index']);
-    Route::post('/', [TeamController::class, 'store']);
-    Route::get('/{team}', [TeamController::class, 'show']);
-    Route::put('/{team}', [TeamController::class, 'update']);
-    Route::delete('/{team}', [TeamController::class, 'destroy']);
-    Route::post('/{team}/members', [TeamController::class, 'addMember']);
-    Route::delete('/{team}/members/{user}', [TeamController::class, 'removeMember']);
+// SEARCH RESULT ROUTES
+Route::middleware(['auth:sanctum', 'token.expire'])->prefix('search-results')->group(function () {
+    Route::get('/', [SearchResultController::class, 'index']);
+    Route::post('/', [SearchResultController::class, 'store']);
+    Route::get('/{searchQuery}', [SearchResultController::class, 'show']);
+    Route::get('/{searchQuery}/download', [SearchResultController::class, 'download']);
 });

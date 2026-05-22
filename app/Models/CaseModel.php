@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class CaseModel extends Model
@@ -45,13 +46,24 @@ class CaseModel extends Model
         return $this->belongsTo(User::class, 'assigned_to');
     }
 
-    public function team(): BelongsTo
+    public function assignedUsers(): BelongsToMany
     {
-        return $this->belongsTo(Team::class, 'team_id');
+        return $this->belongsToMany(User::class, 'case_assignments', 'case_id', 'user_id')
+            ->withTimestamps();
+    }
+
+    public function assignedUsersArray(): HasMany
+    {
+        return $this->hasMany(CaseAssignment::class, 'case_id');
     }
 
     public function searchQueries(): HasMany
     {
         return $this->hasMany(SearchQuery::class, 'case_id');
+    }
+
+    public function activities(): HasMany
+    {
+        return $this->hasMany(CaseActivity::class, 'case_id');
     }
 }

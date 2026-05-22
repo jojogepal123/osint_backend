@@ -19,8 +19,8 @@ class StoreCaseRequest extends FormRequest
             'status' => 'nullable|in:open,in_progress,pending,resolved,closed',
             'priority' => 'nullable|in:low,medium,high,critical',
             'category' => 'nullable|string|max:100',
-            'team_id' => 'nullable|exists:teams,id',
-            'assigned_to' => 'nullable|exists:users,id',
+            'assigned_to' => 'nullable|array',
+            'assigned_to.*' => 'integer|exists:users,id',
         ];
     }
 }
