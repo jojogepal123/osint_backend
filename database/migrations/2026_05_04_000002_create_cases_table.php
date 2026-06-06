@@ -8,6 +8,25 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (!Schema::hasTable('cases')) {
+            Schema::create('cases', function (Blueprint $table) {
+                $table->id();
+                $table->foreignId('user_id')->constrained()->onDelete('cascade');
+                $table->string('case_number')->unique();
+                $table->string('title');
+                $table->text('description')->nullable();
+                $table->enum('status', ['open', 'in_progress', 'pending', 'resolved', 'closed'])->default('open');
+                $table->enum('priority', ['low', 'medium', 'high', 'critical'])->default('medium');
+                $table->string('category')->nullable();
+                $table->foreignId('assigned_to')->nullable()->constrained('users')->nullOnDelete();
+                $table->unsignedBigInteger('team_id')->nullable();
+                $table->timestamp('resolved_at')->nullable();
+                $table->timestamp('closed_at')->nullable();
+                $table->timestamps();
+            });
+            return;
+        }
+
         Schema::table('cases', function (Blueprint $table) {
             $table->dropColumn('status');
         });
@@ -18,7 +37,7 @@ return new class extends Migration
             $table->enum('priority', ['low', 'medium', 'high', 'critical'])->default('medium')->after('status');
             $table->string('category')->nullable()->after('priority');
             $table->foreignId('assigned_to')->nullable()->constrained('users')->nullOnDelete()->after('category');
-            $table->foreignId('team_id')->nullable()->constrained('teams')->nullOnDelete()->after('assigned_to');
+            $table->unsignedBigInteger('team_id')->nullable()->after('assigned_to');
             $table->timestamp('resolved_at')->nullable()->after('team_id');
             $table->timestamp('closed_at')->nullable()->after('resolved_at');
         });
@@ -26,20 +45,6 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::table('cases', function (Blueprint $table) {
-            $table->dropForeign(['assigned_to']);
-            $table->dropForeign(['team_id']);
-            $table->dropColumn([
-                'description',
-                'status',
-                'priority',
-                'category',
-                'assigned_to',
-                'team_id',
-                'resolved_at',
-                'closed_at',
-            ]);
-            $table->enum('status', ['open', 'closed', 'archived'])->default('open');
-        });
+        Schema::dropIfExists('cases');
     }
 };
