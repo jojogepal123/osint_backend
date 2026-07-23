@@ -17,13 +17,63 @@ class ReportController extends Controller
     private function getImageBase64($url)
     {
         try {
-            $imgData = file_get_contents($url);
-            $type = pathinfo($url, PATHINFO_EXTENSION);
+            $imgData = $this->fetchUrl($url);
+            if ($imgData === false || $imgData === null) {
+                return null;
+            }
 
-            return 'data:image/'.$type.';base64,'.base64_encode($imgData);
+            $type = strtolower(pathinfo(parse_url($url, PHP_URL_PATH) ?? '', PATHINFO_EXTENSION));
+            $supported = ['jpg', 'jpeg', 'png', 'gif'];
+
+            if (in_array($type, $supported, true)) {
+                return 'data:image/'.$type.';base64,'.base64_encode($imgData);
+            }
+
+            if (! function_exists('imagecreatefromstring') || ! function_exists('imagejpeg')) {
+                return null;
+            }
+
+            $src = @imagecreatefromstring($imgData);
+            if ($src === false) {
+                return null;
+            }
+
+            ob_start();
+            imagejpeg($src, null, 85);
+            $jpgData = ob_get_clean();
+            imagedestroy($src);
+
+            return 'data:image/jpeg;base64,'.base64_encode($jpgData);
         } catch (Exception $e) {
             return null;
         }
+    }
+
+    private function fetchUrl($url)
+    {
+        $data = @file_get_contents($url);
+        if ($data !== false) {
+            return $data;
+        }
+
+        if (! function_exists('curl_init')) {
+            return false;
+        }
+
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_CONNECTTIMEOUT => 5,
+            CURLOPT_TIMEOUT => 15,
+            CURLOPT_SSL_VERIFYPEER => false,
+            CURLOPT_USERAGENT => 'Mozilla/5.0',
+        ]);
+        $data = curl_exec($ch);
+        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        return ($code >= 200 && $code < 300) ? $data : false;
     }
 
     public function generateReport(Request $request)
@@ -64,6 +114,12 @@ class ReportController extends Controller
                     $url = rtrim(env('FRONTEND_URL'), '/').$url;
                 }
 
+                if (! empty($img['base64'])) {
+                    $data['profile']['profileImages'][$key]['base64'] = $img['base64'];
+
+                    continue;
+                }
+
                 $base64 = $this->getImageBase64($url);
 
                 if ($base64) {
@@ -80,6 +136,13 @@ class ReportController extends Controller
                 foreach ($data['breachData'] as $key => $value) {
                     if (! empty($value['LogoPath'])) {
                         $data['breachData'][$key]['LogoBase64'] = $this->getImageBase64($value['LogoPath']);
+                    }
+                }
+            }
+            if (! empty($data['gravatar']) && is_array($data['gravatar'])) {
+                foreach ($data['gravatar'] as $key => $item) {
+                    if (! empty($item['avatar_url'])) {
+                        $data['gravatar'][$key]['avatar_base64'] = $this->getImageBase64($item['avatar_url']);
                     }
                 }
             }

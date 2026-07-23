@@ -66,7 +66,11 @@
   <div class="img-row">
     @foreach($profile['profileImages'] as $img)
       <div class="img-cell">
-        <img src="{{ $s($img['value'] ?? '') }}" alt="Profile" />
+        @if(!empty($img['base64']))
+          <img src="{{ $img['base64'] }}" alt="Profile" />
+        @else
+          <div style="width:72px;height:72px;border-radius:8px;border:2px solid #0f3460;background:#f8faff;display:flex;align-items:center;justify-content:center;font-size:8px;color:#888;">Not available</div>
+        @endif
         @if(!empty($img['source']))<div class="img-src">{{ $img['source'] }}</div>@endif
       </div>
     @endforeach
@@ -223,10 +227,14 @@
         <td colspan="2">
           @if(is_array($value))
             @foreach($value as $item)
-              @if(is_string($item) && filter_var($item, FILTER_VALIDATE_URL))
-                <a href="{{ $item }}">{{ $item }}</a><br>
+              @if(is_string($item))
+                @if(filter_var($item, FILTER_VALIDATE_URL))
+                  <a href="{{ $item }}">{{ $item }}</a><br>
+                @else
+                  {{ $item }}<br>
+                @endif
               @else
-                {{ $item }}<br>
+                <pre style="font-size:9px; white-space:pre-wrap; word-break:break-all; margin:0;">{{ is_scalar($item) ? $item : json_encode($item, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) }}</pre>
               @endif
             @endforeach
           @elseif(is_string($value) && filter_var($value, FILTER_VALIDATE_URL))
@@ -266,7 +274,8 @@
       <div class="section-title">Gravatar Profile</div>
       <div class="gravatar-tbl">
         <div class="gravatar-img-cell">
-          @if(!empty($item['avatar_url']))<img src="{{ $item['avatar_url'] }}" alt="avatar">
+          @if(!empty($item['avatar_base64']))<img src="{{ $item['avatar_base64'] }}" alt="avatar">
+          @elseif(!empty($item['avatar_url']))<img src="{{ $item['avatar_url'] }}" alt="avatar">
           @else<div style="width:60px;height:60px;background:#e8f0fe;border-radius:8px;border:2px solid #0f3460;line-height:60px;text-align:center;font-size:9px;color:#0f3460;">No Photo</div>@endif
         </div>
         <div class="gravatar-info-cell">
