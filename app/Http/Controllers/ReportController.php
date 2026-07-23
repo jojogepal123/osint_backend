@@ -2,28 +2,78 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\View;
 use Barryvdh\DomPDF\Facade\Pdf;
-use Illuminate\Support\Str;
+use Exception;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Facades\Http;
-use Exception;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\View;
+use Illuminate\Support\Str;
+
 class ReportController extends Controller
 {
-
     private function getImageBase64($url)
     {
         try {
-            $imgData = file_get_contents($url);
-            $type = pathinfo($url, PATHINFO_EXTENSION);
-            return 'data:image/' . $type . ';base64,' . base64_encode($imgData);
+            $imgData = $this->fetchUrl($url);
+            if ($imgData === false || $imgData === null) {
+                return null;
+            }
+
+            $type = strtolower(pathinfo(parse_url($url, PHP_URL_PATH) ?? '', PATHINFO_EXTENSION));
+            $supported = ['jpg', 'jpeg', 'png', 'gif'];
+
+            if (in_array($type, $supported, true)) {
+                return 'data:image/' . $type . ';base64,' . base64_encode($imgData);
+            }
+
+            if (!function_exists('imagecreatefromstring') || !function_exists('imagejpeg')) {
+                return null;
+            }
+
+            $src = @imagecreatefromstring($imgData);
+            if ($src === false) {
+                return null;
+            }
+
+            ob_start();
+            imagejpeg($src, null, 85);
+            $jpgData = ob_get_clean();
+            imagedestroy($src);
+
+            return 'data:image/jpeg;base64,' . base64_encode($jpgData);
         } catch (Exception $e) {
             return null;
         }
+    }
+
+    private function fetchUrl($url)
+    {
+        $data = @file_get_contents($url);
+        if ($data !== false) {
+            return $data;
+        }
+
+        if (!function_exists('curl_init')) {
+            return false;
+        }
+
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_CONNECTTIMEOUT => 5,
+            CURLOPT_TIMEOUT => 15,
+            CURLOPT_SSL_VERIFYPEER => false,
+            CURLOPT_USERAGENT => 'Mozilla/5.0',
+        ]);
+        $data = curl_exec($ch);
+        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        return ($code >= 200 && $code < 300) ? $data : false;
     }
 
     public function generateReport(Request $request)
@@ -46,7 +96,7 @@ class ReportController extends Controller
         // Ensure directory exists
         Storage::makeDirectory('/reports');
 
-        $profileImages = data_get($data, "profile.profileImages", []);
+        $profileImages = data_get($data, 'profile.profileImages', []);
 
         if (is_array($profileImages)) {
 
@@ -55,12 +105,19 @@ class ReportController extends Controller
                 $source = $img['source'] ?? 'Unknown';
                 $url = $img['value'] ?? null;
 
-                if (!$url)
+                if (!$url) {
                     continue;
+                }
 
                 // Fix Telegram relative path
-                if ($source === "Telegram" && Str::startsWith($url, '/telegram_photos/')) {
+                if ($source === 'Telegram' && Str::startsWith($url, '/telegram_photos/')) {
                     $url = rtrim(env('FRONTEND_URL'), '/') . $url;
+                }
+
+                if (!empty($img['base64'])) {
+                    $data['profile']['profileImages'][$key]['base64'] = $img['base64'];
+
+                    continue;
                 }
 
                 $base64 = $this->getImageBase64($url);
@@ -74,7 +131,7 @@ class ReportController extends Controller
         // Render view based on type
         if ($type === 'tel') {
             $html = View::make('report.tel_template', compact('data', 'userEmail'))->render();
-        } else if ($type === 'email') {
+        } elseif ($type === 'email') {
             if (!empty($data['breachData'])) {
                 foreach ($data['breachData'] as $key => $value) {
                     if (!empty($value['LogoPath'])) {
@@ -82,18 +139,28 @@ class ReportController extends Controller
                     }
                 }
             }
+            if (!empty($data['gravatar']) && is_array($data['gravatar'])) {
+                foreach ($data['gravatar'] as $key => $item) {
+                    if (!empty($item['avatar_url'])) {
+                        $data['gravatar'][$key]['avatar_base64'] = $this->getImageBase64($item['avatar_url']);
+                    }
+                }
+            }
             $html = View::make('report.email_template', compact('data', 'userEmail'))->render();
         } else {
             Log::error("Invalid report type: $type");
+
             return response()->json(['error' => 'Invalid type'], 422);
         }
 
         try {
             $pdf = Pdf::loadHTML($html);
             $pdf->save($filePath);
+
             return response()->download($filePath, $filename);
         } catch (Exception $e) {
-            Log::error("PDF generation failed: " . $e->getMessage());
+            Log::error('PDF generation failed: ' . $e->getMessage());
+
             return response()->json(['error' => 'PDF generation failed'], 500);
         }
     }
@@ -115,15 +182,15 @@ class ReportController extends Controller
         $profileImages = data_get($results, 'profile.profileImages', []);
         $profileImagesForPdf = [];
 
-
         if (is_array($profileImages)) {
             foreach ($profileImages as $img) {
 
                 $platform = $img['source'] ?? 'Unknown';
                 $url = $img['value'] ?? null;
 
-                if (!$url)
+                if (!$url) {
                     continue;
+                }
 
                 if (Str::startsWith($url, '/')) {
                     $url = rtrim(config('app.furl'), '/') . $url;
@@ -139,8 +206,6 @@ class ReportController extends Controller
                 }
             }
         }
-
-
 
         $prettyResults = json_encode($results, JSON_PRETTY_PRINT);
 
@@ -176,7 +241,6 @@ class ReportController extends Controller
         {$prettyResults}
         --- End Data ---
         EOT;
-
 
         // Step 3: Call VPS AI API
         $response = Http::timeout(60)
@@ -249,6 +313,7 @@ class ReportController extends Controller
             ->header('Content-Type', 'application/pdf')
             ->header('Content-Disposition', "attachment; filename={$filename}");
     }
+
     public function generateUpiReport(Request $request)
     {
         $validated = $request->validate([
@@ -259,11 +324,17 @@ class ReportController extends Controller
 
         $data = array_filter($validated['data'], function ($value, $key) {
             $key = strtolower($key);
-            if (in_array($key, ['client_id', 'clientid']))
+            if (in_array($key, ['client_id', 'clientid'])) {
                 return false;
-            if (is_null($value) || $value === '')
+            }
+            if (is_null($value) || $value === '') {
                 return false;
+            }
+            if (!is_scalar($value)) {
+                return true;
+            }
             $v = strtolower(trim((string) $value));
+
             return !in_array($v, ['n/a', 'na', 'n.a']);
         }, ARRAY_FILTER_USE_BOTH);
 
@@ -277,12 +348,15 @@ class ReportController extends Controller
                 'userEmail' => $userEmail,
             ])->render();
             Pdf::loadHTML($html)->save($filePath);
+
             return response()->download($filePath, $filename);
         } catch (Exception $e) {
-            Log::error("UPI PDF generation error: " . $e->getMessage());
+            Log::error('UPI PDF generation error: ' . $e->getMessage());
+
             return response()->json(['error' => 'PDF generation failed'], 500);
         }
     }
+
     public function generateRcReport(Request $request)
     {
         $validated = $request->validate([
@@ -292,11 +366,17 @@ class ReportController extends Controller
 
         $data = array_filter($validated['data'], function ($value, $key) {
             $key = strtolower($key);
-            if (in_array($key, ['client_id', 'clientid']))
+            if (in_array($key, ['client_id', 'clientid'])) {
                 return false;
-            if (is_null($value) || $value === '')
+            }
+            if (is_null($value) || $value === '') {
                 return false;
+            }
+            if (!is_scalar($value)) {
+                return true;
+            } // keep arrays/objects as-is
             $v = strtolower(trim((string) $value));
+
             return !in_array($v, ['n/a', 'na', 'n.a']);
         }, ARRAY_FILTER_USE_BOTH);
 
@@ -310,15 +390,17 @@ class ReportController extends Controller
                 'userEmail' => $userEmail,
             ])->render();
             Pdf::loadHTML($html)->save($filePath);
+
             return response()->download($filePath, $filename);
         } catch (Exception $e) {
-            Log::error("RC PDF generation error: " . $e->getMessage());
+            Log::error('RC PDF generation error: ' . $e->getMessage());
+
             return response()->json(['error' => 'PDF generation failed'], 500);
         }
     }
+
     public function generateChallanReport(Request $request)
     {
-
 
         $validated = $request->validate([
             'data' => ['required', 'array'],
@@ -329,14 +411,18 @@ class ReportController extends Controller
         // Fix: Properly handle nested arrays like challan_details
         $data = array_filter($validated['data'], function ($value, $key) {
             $key = strtolower($key);
-            if (in_array($key, ['client_id', 'clientid']))
+            if (in_array($key, ['client_id', 'clientid'])) {
                 return false;
-            if (is_null($value) || $value === '')
+            }
+            if (is_null($value) || $value === '') {
                 return false;
+            }
             if (is_scalar($value)) {
                 $v = strtolower(trim((string) $value));
+
                 return !in_array($v, ['n/a', 'na', 'n.a']);
             }
+
             return true; // Keep arrays like challan_details
         }, ARRAY_FILTER_USE_BOTH);
 
@@ -350,11 +436,98 @@ class ReportController extends Controller
                 'userEmail' => $userEmail,
             ])->render();
             Pdf::loadHTML($html)->save($filePath);
+
             return response()->download($filePath, $filename);
         } catch (Exception $e) {
-            Log::error("Challan PDF generation error: " . $e->getMessage());
+            Log::error('Challan PDF generation error: ' . $e->getMessage());
+
             return response()->json(['error' => 'PDF generation failed'], 500);
         }
     }
 
+    public function generateVerificationReport(Request $request)
+    {
+        $validated = $request->validate([
+            'data' => ['required', 'array'],
+            'title' => ['sometimes', 'string'],
+            'searchInput' => ['sometimes', 'string'],
+        ]);
+
+        $userEmail = Auth::check() ? Auth::user()->email : 'N/A';
+        $title = $validated['title'] ?? 'Verification';
+        $searchInput = $validated['searchInput'] ?? '';
+
+        $data = array_filter($validated['data'], function ($value, $key) {
+            if (in_array(strtolower($key), ['client_id', 'clientid', 'verification_id'])) {
+                return false;
+            }
+            if (is_null($value) || $value === '') {
+                return false;
+            }
+            if (is_scalar($value)) {
+                $v = strtolower(trim((string) $value));
+
+                return !in_array($v, ['n/a', 'na', 'n.a']);
+            }
+
+            return true;
+        }, ARRAY_FILTER_USE_BOTH);
+
+        $filename = 'verification_' . now()->format('Ymd_His') . '_' . Str::uuid() . '.pdf';
+        $filePath = storage_path("app/private/reports/{$filename}");
+        Storage::makeDirectory('private/reports');
+
+        try {
+            $html = View::make('report.verification_template', [
+                'data' => $data,
+                'title' => $title,
+                'searchInput' => $searchInput,
+                'userEmail' => $userEmail,
+            ])->render();
+            Pdf::loadHTML($html)->save($filePath);
+
+            return response()->download($filePath, $filename);
+        } catch (Exception $e) {
+            Log::error('Verification PDF generation error: ' . $e->getMessage());
+
+            return response()->json(['error' => 'PDF generation failed'], 500);
+        }
+    }
+
+    public function generateSocialReport(Request $request)
+    {
+        $validated = $request->validate([
+            'data' => ['required', 'array'],
+        ]);
+
+        $userEmail = Auth::check() ? Auth::user()->email : 'N/A';
+        $data = $validated['data'];
+
+        // Convert photo URL to base64
+        $photoUrl = data_get($data, 'photo.url') ?? ($data['photoUrl'] ?? null);
+        if ($photoUrl) {
+            $base64 = $this->getImageBase64($photoUrl);
+            if ($base64) {
+                $data['_photoBase64'] = $base64;
+            }
+        }
+
+        $filename = 'social_intel_' . Str::slug($data['fullName'] ?? 'profile') . '_' . now()->format('Ymd_His') . '.pdf';
+        $filePath = storage_path("app/private/reports/{$filename}");
+        Storage::makeDirectory('private/reports');
+
+        try {
+            $html = View::make('report.social_template', [
+                'data' => $data,
+                'userEmail' => $userEmail,
+            ])->render();
+            Pdf::loadHTML($html)->save($filePath);
+
+            return response()->download($filePath, $filename);
+        } catch (Exception $e) {
+            Log::error('Social Intel PDF error: ' . $e->getMessage());
+
+            return response()->json(['error' => 'PDF generation failed'], 500);
+        }
+    }
 }

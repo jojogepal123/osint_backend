@@ -1,21 +1,29 @@
 <?php
+
 /**
  * Class HLRRESTClient
  *
  * The base class for the HLR REST API client.
  */
 
- namespace HlrLookup;
-class HLRRESTClient {
+namespace HlrLookup;
 
+class HLRRESTClient
+{
     protected $scheme;
+
     protected $host;
+
     protected $path;
+
     protected $port;
+
     protected $basicAuthUsername;
+
     protected $basicAuthPassword;
 
-    public function __construct($scheme = 'https', $host = 'www.example.com', $path = '/api', $port = null, $basicAuthUsername = null, $basicAuthPassword = null) {
+    public function __construct($scheme = 'https', $host = 'www.example.com', $path = '/api', $port = null, $basicAuthUsername = null, $basicAuthPassword = null)
+    {
         foreach (get_defined_vars() as $key => $value) {
             $this->$key = $value;
         }
@@ -24,18 +32,17 @@ class HLRRESTClient {
     /**
      * Sends an arbitrate HTTP GET, POST, PUT or DELETE request
      *
-     * @param $endpoint
-     * @param $requestType
-     * @param array $requestBody
-     * @param bool|false $sendAsJson
-     * @param array $query
-     * @param array $headers
-     * @param array $customOptions
+     * @param  array  $requestBody
+     * @param  bool|false  $sendAsJson
+     * @param  array  $query
+     * @param  array  $headers
+     * @param  array  $customOptions
      * @return HLRRESTClientResponseObject
      */
-    protected function sendRequest($endpoint, $requestType, $requestBody = array(), $sendAsJson = false, $query = array(), $headers = array(), $customOptions = array()) {
+    protected function sendRequest($endpoint, $requestType, $requestBody = [], $sendAsJson = false, $query = [], $headers = [], $customOptions = [])
+    {
 
-        $ch = curl_init($this->scheme . '://' . $this->host . $this->path . $endpoint . (!empty($query) ? '?' . http_build_query($query) : null));
+        $ch = curl_init($this->scheme.'://'.$this->host.$this->path.$endpoint.(! empty($query) ? '?'.http_build_query($query) : null));
         curl_setopt($ch, CURLOPT_PORT, $this->port ? $this->port : ($this->scheme == 'https' ? 443 : 80));
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
@@ -47,8 +54,8 @@ class HLRRESTClient {
         curl_setopt($ch, CURLINFO_HEADER_OUT, true);
         curl_setopt($ch, CURLOPT_HEADER, true);
 
-        if (!is_null($this->basicAuthUsername) && !is_null($this->basicAuthPassword)) {
-            curl_setopt($ch, CURLOPT_USERPWD, $this->basicAuthUsername . ":" . $this->basicAuthPassword);
+        if (! is_null($this->basicAuthUsername) && ! is_null($this->basicAuthPassword)) {
+            curl_setopt($ch, CURLOPT_USERPWD, $this->basicAuthUsername.':'.$this->basicAuthPassword);
         }
 
         array_push($headers, 'Expect:'); // prevent "HTTP/1.1 100 Continue"
@@ -56,24 +63,24 @@ class HLRRESTClient {
         curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
 
         switch ($requestType) {
-            case('POST'):
+            case 'POST':
                 curl_setopt($ch, CURLOPT_POST, true);
                 curl_setopt($ch, CURLOPT_POSTFIELDS, $sendAsJson ? json_encode($requestBody) : $requestBody);
                 break;
-            case('GET'):
+            case 'GET':
                 break;
-            case('DELETE'):
-                curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "DELETE");
+            case 'DELETE':
+                curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'DELETE');
                 curl_setopt($ch, CURLOPT_POSTFIELDS, $sendAsJson ? json_encode($requestBody) : $requestBody);
                 break;
-            case('PUT'):
-                curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "PUT");
+            case 'PUT':
+                curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'PUT');
                 curl_setopt($ch, CURLOPT_POSTFIELDS, $sendAsJson ? json_encode($requestBody) : $requestBody);
                 break;
             default:
                 // invalid request type
                 exit;
-                
+
         }
 
         foreach ($customOptions as $key => $value) {
@@ -85,7 +92,7 @@ class HLRRESTClient {
         $responseHeaders = null;
         $responseBody = null;
         if (strpos($response, $separator)) {
-            list($responseHeaders, $responseBody) = explode($separator, $response, 2);
+            [$responseHeaders, $responseBody] = explode($separator, $response, 2);
         }
 
         $restClientResponseObject = new HLRRESTClientResponseObject(
@@ -102,5 +109,4 @@ class HLRRESTClient {
         return $restClientResponseObject;
 
     }
-
 }

@@ -1,105 +1,62 @@
 <!DOCTYPE html>
-<html>
-
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <title>Challan Report</title>
+  @include('report.partials.theme')
   <style>
-    body {
-      font-family: DejaVu Sans, sans-serif;
-      font-size: 14px;
-      color: #333;
-    }
-
-    h2 {
-      color: green;
-      margin-bottom: 10px;
-    }
-
-    .section {
-      margin-bottom: 20px;
-    }
-
-    .label {
-      font-weight: bold;
-    }
-
-    .value {
-      margin-bottom: 10px;
-    }
-
-    .challan {
-      margin-left: 20px;
-      margin-bottom: 20px;
-    }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 5px;
-    }
-
-    th,
-    td {
-      border: 1px solid #888;
-      padding: 6px;
-      text-align: left;
-    }
+    .challan-card { border: 1px solid #d0dce8; border-radius: 4px; margin-bottom: 14px; overflow: hidden; }
+    .challan-card-head { background: #0f3460; color: #a8ff78; font-weight: bold; font-size: 11px; padding: 7px 12px; }
   </style>
 </head>
-
 <body>
 
-  <h2>Challan Details: {{ $data['rc_number'] ?? '-' }}</h2>
+  @include('report.partials.header', ['reportType' => 'RC Challan Details Report'])
 
-  <div class="section">
-    <div class="label">Rc Number:</div>
-    <div class="value">{{ $data['rc_number'] ?? '-' }}</div>
+  <div class="rpt-subject">
+    <div class="rpt-subject-label">Vehicle Registration Number</div>
+    <div class="rpt-subject-value">{{ strtoupper($data['rc_number'] ?? 'N/A') }}</div>
   </div>
 
   <div class="section">
-    <div class="label">Challan Details:</div>
+    <div class="section-title">Challan Records</div>
+
     @if (!empty($data['challan_details']) && is_array($data['challan_details']))
-      @foreach ($data['challan_details'] as $challan)
-        <div class="challan-entry" style="margin-bottom: 20px; padding: 10px;">
-          @foreach ($challan as $key => $value)
-            @if (is_array($value))
-              <div style="margin-bottom: 10px;">
-                <strong>{{ ucfirst(str_replace('_', ' ', $key)) }}:</strong>
-                <ul style="margin-left: 15px;">
-                  @foreach ($value as $item)
-                    <li>
-                      @if (is_array($item))
-                        @foreach ($item as $subKey => $subValue)
-                          <div>
-                            <strong>{{ ucfirst(str_replace('_', ' ', $subKey)) }}:</strong> {{ $subValue }}
-                          </div>
-                        @endforeach
-                      @else
-                        {{ $item }}
-                      @endif
-                    </li>
-                  @endforeach
-                </ul>
-              </div>
-            @else
-              <div style="margin-bottom: 5px;">
-                <strong>{{ ucfirst(str_replace('_', ' ', $key)) }}:</strong> {{ $value }}
-              </div>
-            @endif
-          @endforeach
+      @foreach ($data['challan_details'] as $index => $challan)
+        <div class="challan-card">
+          <div class="challan-card-head">Challan #{{ $index + 1 }}
+            @if (!empty($challan['challan_number'])) &nbsp;&mdash;&nbsp; {{ $challan['challan_number'] }} @endif
+          </div>
+          <table>
+            @foreach ($challan as $key => $value)
+              @if (!is_array($value) && !is_null($value) && $value !== '' && strtolower((string)$value) !== 'n/a')
+                <tr>
+                  <td class="td-key">{{ ucwords(str_replace('_', ' ', $key)) }}</td>
+                  <td class="td-val">{{ $value }}</td>
+                </tr>
+              @endif
+              @if (is_array($value) && count($value) > 0)
+                @foreach ($value as $subKey => $subVal)
+                  @if (!is_array($subVal) && !is_null($subVal) && $subVal !== '')
+                    <tr>
+                      <td class="td-key" style="padding-left:20px; color:#555;">
+                        &rsaquo; {{ ucwords(str_replace('_', ' ', $subKey)) }}
+                      </td>
+                      <td class="td-val">{{ $subVal }}</td>
+                    </tr>
+                  @endif
+                @endforeach
+              @endif
+            @endforeach
+          </table>
         </div>
-        <hr>
       @endforeach
     @else
-      <div class="value">No challan details available.</div>
+      <p class="no-data">No challan records found for this vehicle.</p>
     @endif
   </div>
 
-  <div>
-    <p><strong>Downloaded by:</strong> {{ $userEmail }}</p>
-  </div>
+  @include('report.partials.footer')
 
 </body>
-
 </html>

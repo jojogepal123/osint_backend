@@ -2,10 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
-use App\Models\User;
 
 class GoogleAuthController extends Controller
 {
@@ -17,10 +17,10 @@ class GoogleAuthController extends Controller
 
         // Verify Google token
         $response = Http::withHeaders([
-            'Authorization' => 'Bearer ' . $request->token,
+            'Authorization' => 'Bearer '.$request->token,
         ])->get('https://www.googleapis.com/oauth2/v1/userinfo?alt=json');
 
-        if (!$response->ok()) {
+        if (! $response->ok()) {
             return response()->json(['error' => 'Invalid token'], 401);
         }
 

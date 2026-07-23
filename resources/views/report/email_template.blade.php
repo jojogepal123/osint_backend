@@ -1,629 +1,326 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-    <meta charset="UTF-8">
-    <title>Email OSINT Report</title>
-    <style>
-        body {
-            background-color: #f9fafb;
-            color: #111827;
-            font-family: Arial, sans-serif;
-            font-size: 14px;
-            padding: 24px;
-        }
-
-        h1 {
-            font-size: 24px;
-            font-weight: bold;
-            color: #2563eb;
-            margin-bottom: 24px;
-        }
-
-        #title {
-            background-color: rgba(209, 213, 219, 0.53);
-            padding: 12px 16px;
-            border-radius: 6px;
-            font-size: 20px;
-            font-weight: bold;
-            border-left: 4px solid #2563eb;
-        }
-
-        h2 {
-            font-size: 18px;
-            font-weight: bold;
-            color: #1f2937;
-            border-bottom: 1px solid #d1d5db;
-            margin-bottom: 12px;
-            padding-bottom: 4px;
-        }
-
-        .section {
-            background-color: #ffffff;
-            border: 1px solid #e5e7eb;
-            border-radius: 8px;
-            padding: 16px;
-            margin-bottom: 24px;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-        }
-
-        ul {
-            padding-left: 20px;
-            margin-top: 8px;
-        }
-
-        li {
-            margin-bottom: 6px;
-        }
-
-        .card-li {
-            background-color: #f3f4f6;
-            padding: 8px 12px;
-            border-radius: 6px;
-            font-size: 14px;
-            display: flex;
-            justify-content: space-between;
-        }
-
-        .source-label {
-            font-size: 11px;
-            color: #6b7280;
-            margin-left: 4px;
-        }
-
-        .profile-images {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 16px;
-        }
-
-        .image-box {
-            width: 120px;
-            text-align: center;
-        }
-
-        .image-box img {
-            width: 100%;
-            border-radius: 8px;
-            border: 1px solid #d1d5db;
-        }
-
-        .gravatar-avatar,
-        .avatar-placeholder {
-            width: 96px;
-            height: 96px;
-            border-radius: 12px;
-            border: 2px solid #9ca3af;
-            object-fit: cover;
-        }
-
-        .avatar-placeholder {
-            background-color: #e5e7eb;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #6b7280;
-            font-size: 12px;
-        }
-
-        .grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-            gap: 12px;
-            margin-top: 8px;
-        }
-
-        .grid-item {
-            background-color: #f3f4f6;
-            padding: 8px 12px;
-            border-radius: 6px;
-            font-size: 14px;
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 8px;
-        }
-
-        .status-active {
-            color: #16a34a;
-            font-weight: bold;
-        }
-
-        .status-inactive {
-            color: #dc2626;
-            font-weight: bold;
-        }
-
-        .gravatar-card {
-            display: flex;
-            gap: 16px;
-            align-items: flex-start;
-        }
-
-        .osint-card,
-        .breach-card {
-            margin-top: 12px;
-        }
-
-        .breach-entry {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 10px;
-            background-color: #f3f4f6;
-            padding: 8px 12px;
-            border-radius: 6px;
-            font-size: 14px;
-            gap: 10px;
-        }
-
-        .breach-entry img {
-            width: 24px;
-            height: 24px;
-            border-radius: 50%;
-            margin-right: 10px;
-        }
-
-        #legal-disclaimer {
-            page-break-before: always;
-            font-size: 12px;
-            background-color: #fefce8;
-            border: 1px solid #facc15;
-            color: #78350f;
-        }
-
-        #confidential-disclaimer {
-            font-size: 13px;
-            background-color: #f0f9ff;
-            border: 1px solid #0ea5e9;
-            color: #0c4a6e;
-        }
-
-        a {
-            color: #2563eb;
-            text-decoration: underline;
-        }
-
-        .info-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 24px;
-            background: #fff;
-            border: 1px solid #e5e7eb;
-            font-size: 15px;
-        }
-
-        .info-table th,
-        .info-table td {
-            border: 1px solid #e5e7eb;
-            padding: 8px 12px;
-            vertical-align: middle;
-        }
-
-        .info-table th {
-            background: #f3f4f6;
-            color: #1e40af;
-            font-weight: 600;
-            text-align: left;
-            width: 200px;
-            white-space: nowrap;
-        }
-
-        .info-table .source-label {
-            font-size: 11px;
-            color: #6b7280;
-            margin-left: 4px;
-        }
-        .map-key{
-            color: #1e40af;
-            font-weight: 600;
-            text-align: left;
-            width: 200px;
-            white-space: nowrap;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <title>Email Intelligence Report</title>
+  @include('report.partials.theme')
+  <style>
+    .img-row { display: table; width: 100%; }
+    .img-cell { display: table-cell; width: 90px; padding-right: 10px; vertical-align: top; text-align: center; }
+    .img-cell img { width: 72px; height: 72px; border-radius: 8px; border: 2px solid #0f3460; object-fit: cover; }
+    .img-src { font-size: 8px; color: #888; margin-top: 2px; }
+    .pills-wrap { padding: 4px 0; }
+    .gravatar-tbl { display: table; width: 100%; }
+    .gravatar-img-cell { display: table-cell; width: 70px; vertical-align: top; }
+    .gravatar-img-cell img { width: 60px; height: 60px; border-radius: 8px; border: 2px solid #0f3460; object-fit: cover; }
+    .gravatar-info-cell { display: table-cell; vertical-align: top; padding-left: 12px; font-size: 11px; color: #333; }
+    .gravatar-info-cell p { margin-bottom: 4px; }
+    .breach-card { border: 1px solid #d0dce8; border-radius: 4px; margin-bottom: 6px; padding: 6px 12px; background: #f8faff; display: table; width: 100%; }
+    .breach-logo-cell { display: table-cell; width: 28px; vertical-align: middle; }
+    .breach-logo-cell img { width: 22px; height: 22px; border-radius: 50%; }
+    .breach-name-cell { display: table-cell; vertical-align: middle; font-size: 11px; font-weight: bold; color: #0f3460; padding-left: 8px; }
+  </style>
 </head>
-
 <body>
-    <h1 id="title">Email OSINT Report</h1>
 
-    @php $profile = $data['profile'] ?? []; @endphp
+@php
+  $s = function($v, $fallback = '') {
+      if (is_null($v)) return $fallback;
+      if (is_bool($v)) return $v ? 'Yes' : 'No';
+      if (is_array($v)) {
+          $flat = array_filter($v, 'is_scalar');
+          return count($flat) ? implode(', ', $flat) : $fallback;
+      }
+      $str = (string)$v;
+      return ($str === '' || strtolower($str) === 'n/a') ? $fallback : $str;
+  };
+  $profile = $data['profile'] ?? [];
+  $subjectEmail = '';
+  if (!empty($profile['emails'][0]['value'])) $subjectEmail = $profile['emails'][0]['value'];
+  elseif (!empty($data['email'])) $subjectEmail = $data['email'];
+@endphp
 
-    {{-- Confidential Disclaimer --}}
-    <div class="section" id="confidential-disclaimer">
-        <h2>CONFIDENTIAL – FOR AUTHORIZED LAW ENFORCEMENT PERSONNEL ONLY</h2>
-        <p>
-            This report is intended strictly for legitimate investigative use by authorized law enforcement officers, in
-            accordance with applicable Indian laws and regulations. It contains intelligence derived solely from
-            publicly
-            accessible sources and licensed investigative tools. No unauthorized, leaked, or unlawfully obtained data is
-            included.
-        </p>
-        <p>
-            Distribution of this report through unauthorized channels—including but not limited to WhatsApp, Telegram,
-            email
-            groups, or other social media platforms—is strictly prohibited.
-        </p>
-        <p>
-            All information contained herein must be handled with utmost confidentiality and used in full compliance
-            with
-            applicable legal frameworks, including the <strong>Information Technology Act, 2000</strong>, and the
-            <strong>Digital Personal Data Protection Act, 2023</strong> (upon its enforcement).
-        </p>
-        <p>
-            Law enforcement personnel are solely responsible for ensuring that any use of this information is supported
-            by
-            appropriate legal authorization or explicit consent from the data subject, as required.
-        </p>
-        <p>
-            <strong>OSINTWORK</strong> operates solely as a technical intermediary and does not store or retain any
-            personal
-            data. It assumes no liability for the unauthorized use, distribution, or interpretation of the information
-            contained in this report.
-        </p>
+@include('report.partials.header', ['reportType' => 'Email Intelligence Report'])
+
+@if ($subjectEmail)
+<div class="rpt-subject">
+  <div class="rpt-subject-label">Target Email Address</div>
+  <div class="rpt-subject-value">{{ $subjectEmail }}</div>
+</div>
+@endif
+
+{{-- ── Confidential Disclaimer ── --}}
+<div class="section" style="margin-top:16px;">
+  <div class="section-title">CONFIDENTIAL – FOR AUTHORIZED LAW ENFORCEMENT PERSONNEL ONLY</div>
+  <p style="font-size:11px; line-height:1.6; color:#333; margin-bottom:6px;">This report is intended strictly for legitimate investigative use by authorized law enforcement officers, in accordance with applicable Indian laws and regulations. It contains intelligence derived solely from publicly accessible sources and licensed investigative tools. No unauthorized, leaked, or unlawfully obtained data is included.</p>
+  <p style="font-size:11px; line-height:1.6; color:#333; margin-bottom:6px;">Distribution of this report through unauthorized channels—including but not limited to WhatsApp, Telegram, email groups, or other social media platforms—is strictly prohibited.</p>
+  <p style="font-size:11px; line-height:1.6; color:#333; margin-bottom:6px;">All information contained herein must be handled with utmost confidentiality and used in full compliance with applicable legal frameworks, including the <strong>Information Technology Act, 2000</strong>, and the <strong>Digital Personal Data Protection Act, 2023</strong> (upon its enforcement).</p>
+  <p style="font-size:11px; line-height:1.6; color:#333; margin-bottom:6px;">Law enforcement personnel are solely responsible for ensuring that any use of this information is supported by appropriate legal authorization or explicit consent from the data subject, as required.</p>
+  <p style="font-size:11px; line-height:1.6; color:#333;"><strong>{{ config('app.name', 'DRASHTA') }}</strong> operates solely as a technical intermediary and does not store or retain any personal data. It assumes no liability for the unauthorized use, distribution, or interpretation of the information contained in this report.</p>
+</div>
+
+{{-- ── Profile Images ── --}}
+@if(!empty($profile['profileImages']))
+<div class="section">
+  <div class="section-title">Profile Images</div>
+  <div class="img-row">
+    @foreach($profile['profileImages'] as $img)
+      <div class="img-cell">
+        @if(!empty($img['base64']))
+          <img src="{{ $img['base64'] }}" alt="Profile" />
+        @else
+          <div style="width:72px;height:72px;border-radius:8px;border:2px solid #0f3460;background:#f8faff;display:flex;align-items:center;justify-content:center;font-size:8px;color:#888;">Not available</div>
+        @endif
+        @if(!empty($img['source']))<div class="img-src">{{ $img['source'] }}</div>@endif
+      </div>
+    @endforeach
+  </div>
+</div>
+@endif
+
+{{-- ── Basic Fields ── --}}
+@foreach([
+  'fullNames'   => 'Full Names',
+  'userNames'   => 'Usernames',
+  'emails'      => 'Emails',
+  'phones'      => 'Phone Numbers',
+  'locations'   => 'Locations',
+  'lastUpdated' => 'Last Updated',
+  'basicInfo'   => 'Basic Info',
+] as $field => $label)
+  @if(!empty($profile[$field]))
+  <div class="section">
+    <div class="section-title">{{ $label }}</div>
+    <table>
+      @foreach($profile[$field] as $item)
+        @php $val = is_array($item['value'] ?? '') ? json_encode($item['value']) : ($item['value'] ?? ''); @endphp
+        @if($val)
+        <tr>
+          <th>{{ $label }}</th>
+          <td>{{ $val }}@if(!empty($item['source']))<span class="source-label">({{ $item['source'] }})</span>@endif</td>
+        </tr>
+        @endif
+      @endforeach
+    </table>
+  </div>
+  @endif
+@endforeach
+
+{{-- ── Skills ── --}}
+@if(!empty($profile['skills']))
+<div class="section">
+  <div class="section-title">Skills</div>
+  <div class="pills-wrap">
+    @foreach($profile['skills'] as $skill)
+      @php $sv = $s($skill['value'] ?? (is_string($skill) ? $skill : '')); @endphp
+      @if($sv)<span class="skill-pill">{{ $sv }}</span>@endif
+    @endforeach
+  </div>
+</div>
+@endif
+
+{{-- ── Qualifications ── --}}
+@if(!empty($profile['qualifications']))
+<div class="section">
+  <div class="section-title">Qualifications</div>
+  @foreach($profile['qualifications'] as $qual)
+    <div class="card">
+      <div class="card-head">{{ $s($qual['degree'] ?? '') ?: 'Degree' }}</div>
+      <div class="card-body">
+        @if($s($qual['field'] ?? ''))<div class="card-row"><span class="card-label">Field: </span>{{ $s($qual['field']) }}</div>@endif
+        @if($s($qual['school'] ?? ''))<div class="card-row"><span class="card-label">School: </span>{{ $s($qual['school']) }}</div>@endif
+        @if($s($qual['startYear'] ?? '') || $s($qual['endYear'] ?? ''))
+          <div class="card-row"><span class="card-label">Period: </span>{{ $s($qual['startYear'] ?? '?') }} &mdash; {{ $s($qual['endYear'] ?? '?') }}</div>
+        @endif
+        @if(!empty($qual['source']))<div class="card-row"><span class="source-label">Source: {{ $qual['source'] }}</span></div>@endif
+      </div>
     </div>
+  @endforeach
+</div>
+@endif
 
-    {{-- Profile Images --}}
-    @if(!empty($profile['profileImages']))
-        <div class="section">
-            <h2>Profile Images</h2>
-            <div class="profile-images">
-                @foreach($profile['profileImages'] as $img)
-                    <div class="image-box">
-                        <img src="{{ $img['value'] }}" alt="Profile Image">
-                        @if(!empty($img['source']))
-                            <div class="source-label">(Source: {{ $img['source'] }})</div>
-                        @endif
-                    </div>
-                @endforeach
-            </div>
-        </div>
-    @endif
-
-    {{-- Basic Fields --}}
-    @foreach([
-    'fullNames' => 'Full Names',
-    'userNames' => 'Usernames',
-    'emails' => 'Emails',
-    'phones' => 'Phone Numbers',
-    'locations' => 'Locations',
-    'lastUpdated' => 'Last Updated',
-    'basicInfo' => 'Basic Info'
-] as $field => $label)
-        @if(!empty($profile[$field]))
-            <div class="section">
-                <h2>{{ $label }}</h2>
-                <table class="info-table">
-                    @foreach($profile[$field] as $item)
-                        <tr>
-                            <th>{{ $label }}</th>
-                            <td>
-                                {{ is_array($item['value'] ?? '') ? json_encode($item['value']) : ($item['value'] ?? 'N/A') }}
-                                @if(!empty($item['source']))
-                                    <span class="source-label">(Source: {{ $item['source'] }})</span>
-                                @endif
-                            </td>
-                        </tr>
-                    @endforeach
-                </table>
-            </div>
+{{-- ── Experience ── --}}
+@if(!empty($profile['experience']))
+<div class="section">
+  <div class="section-title">Work Experience</div>
+  @foreach($profile['experience'] as $job)
+    <div class="card">
+      <div class="card-head">{{ $s($job['title'] ?? '') ?: 'Role' }}@if($s($job['company'] ?? '')) &nbsp;at {{ $s($job['company']) }}@endif</div>
+      <div class="card-body">
+        @if($s($job['startYear'] ?? '') || $s($job['endYear'] ?? ''))
+          <div class="card-row"><span class="card-label">Period: </span>{{ $s($job['startYear'] ?? '?') }} &mdash; {{ $s($job['endYear'] ?? '?') }}</div>
         @endif
-    @endforeach
+        @if(!empty($job['source']))<div class="card-row"><span class="source-label">Source: {{ $job['source'] }}</span></div>@endif
+      </div>
+    </div>
+  @endforeach
+</div>
+@endif
 
-    {{-- Skills --}}
-    @if(!empty($profile['skills']))
-        <div class="section">
-            <h2>Skills</h2>
-            <table class="info-table">
-                @foreach($profile['skills'] as $skill)
-                    <tr>
-                        <th>Skill</th>
-                        <td>
-                            {{ $skill['value'] ?? 'N/A' }}
-                            @if(!empty($skill['source']))
-                                <span class="source-label">(Source: {{ $skill['source'] }})</span>
-                            @endif
-                        </td>
-                    </tr>
-                @endforeach
-            </table>
-        </div>
-    @endif
-
-    {{-- Qualifications --}}
-    @if(!empty($profile['qualifications']))
-
-                 <div class="section">
-            <h2>Qualifications</h2>
-            <table class="info-table">
-                @foreach($profile['qualifications'] as $qual)
-                    <tr>
-                        <th>Qualification</th>
-                        <td>
-                            <strong>{{ $qual['degree'] ?? 'N/A' }}</strong> in {{ $qual['field'] ?? 'N/A' }} @ {{ $qual['school'] ?? 'N/A' }}
-                            ({{ $qual['startYear'] ?? '?' }} - {{ $qual['endYear'] ?? '?' }})
-                            @if(!empty($qual['url']))
-                                - <a href="{{ $qual['url'] }}">View</a>
-                            @endif
-                            @if(!empty($qual['source']))
-                                <span class="source-label">(Source: {{ $qual['source'] }})</span>
-                            @endif
-                        </td>
-                    </tr>
-                @endforeach
-            </table>
-        </div>
-    @endif
-
-    {{-- Experience --}}
-    @if(!empty($profile['experience']))
-        <div class="section">
-            <h2>Experience</h2>
-            <table class="info-table">
-                @foreach($profile['experience'] as $job)
-                    <tr>
-                        <th>Experience</th>
-                        <td>
-                            <strong>{{ $job['title'] ?? 'N/A' }}</strong> @ {{ $job['company'] ?? 'N/A' }}
-                            ({{ $job['startYear'] ?? '?' }} - {{ $job['endYear'] ?? '?' }})
-                            @if(!empty($job['url']))
-                                - <a href="{{ $job['url'] }}">View</a>
-                            @endif
-                            @if(!empty($job['source']))
-                                <span class="source-label">(Source: {{ $job['source'] }})</span>
-                            @endif
-                        </td>
-                    </tr>
-                @endforeach
-            </table>
-        </div>
-    @endif
-
-    {{-- SignalHire Professional Data --}}
-    @foreach([
-    'shBio' => 'Bio',
-    'shExperience' => 'Experience',
-    'shEducation' => 'Education',
-    'shSkills' => 'Skills',
-    'shCertifications' => 'Certifications',
-    'shOrganizations' => 'Organizations',
-    'shHonorAwards' => 'Awards & Honors',
+{{-- ── SignalHire Professional Data ── --}}
+@foreach([
+  'shBio'           => 'Bio',
+  'shExperience'    => 'Experience (SH)',
+  'shEducation'     => 'Education (SH)',
+  'shSkills'        => 'Skills (SH)',
+  'shCertifications'=> 'Certifications',
+  'shOrganizations' => 'Organizations',
+  'shHonorAwards'   => 'Awards & Honors',
 ] as $field => $label)
-        @if(!empty($profile[$field]))
-            <div class="section">
-                <h2>{{ $label }}</h2>
-                <table class="info-table">
-                    @foreach($profile[$field] as $item)
-                        <tr>
-                            @if(!empty($item['key']))
-                                <th>{{ $item['key'] }}</th>
-                            @else
-                                <th>{{ $label }}</th>
-                            @endif
-                            <td>
-                                {{ is_array($item['value'] ?? '') ? json_encode($item['value']) : ($item['value'] ?? 'N/A') }}
-                                @if(!empty($item['source']))
-                                    <span class="source-label">(Source: {{ $item['source'] }})</span>
-                                @endif
-                            </td>
-                        </tr>
-                    @endforeach
-                </table>
-            </div>
+  @if(!empty($profile[$field]))
+  <div class="section">
+    <div class="section-title">{{ $label }}</div>
+    <table>
+      @foreach($profile[$field] as $item)
+        @php $val = is_array($item['value'] ?? '') ? json_encode($item['value']) : ($item['value'] ?? ''); @endphp
+        @if($val)
+        <tr>
+          <th>{{ $s($item['key'] ?? '') ?: $label }}</th>
+          <td>{{ $val }}@if(!empty($item['source']))<span class="source-label">({{ $item['source'] }})</span>@endif</td>
+        </tr>
         @endif
+      @endforeach
+    </table>
+  </div>
+  @endif
+@endforeach
+
+{{-- ── Social Profiles ── --}}
+@if(!empty($profile['shSocialLinks']))
+<div class="section">
+  <div class="section-title">Social Profiles</div>
+  <table>
+    @foreach($profile['shSocialLinks'] as $link)
+      <tr>
+        <th>{{ $s($link['key'] ?? '') ?: 'Profile' }}</th>
+        <td>
+          @if(!empty($link['url']))<a href="{{ $link['url'] }}">{{ $s($link['value'] ?? $link['url']) }}</a>
+          @else{{ $s($link['value'] ?? '') }}@endif
+          @if(!empty($link['source']))<span class="source-label">({{ $link['source'] }})</span>@endif
+        </td>
+      </tr>
     @endforeach
+  </table>
+</div>
+@endif
 
-    {{-- Social Profiles --}}
-    @if(!empty($profile['shSocialLinks']))
-        <div class="section">
-            <h2>Social Profiles</h2>
-            <table class="info-table">
-                @foreach($profile['shSocialLinks'] as $link)
-                    <tr>
-                        <th>{{ $link['key'] ?? 'Profile' }}</th>
-                        <td>
-                            @if(!empty($link['url']))
-                                <a href="{{ $link['url'] }}" target="_blank">{{ $link['value'] ?? $link['url'] }}</a>
-                            @else
-                                {{ $link['value'] ?? 'N/A' }}
-                            @endif
-                            @if(!empty($link['source']))
-                                <span class="source-label">(Source: {{ $link['source'] }})</span>
-                            @endif
-                        </td>
-                    </tr>
-                @endforeach
-            </table>
-        </div>
-    @endif
+{{-- ── Internet Presence ── --}}
+@if(!empty($profile['socialMediaPresence']))
+<div class="section">
+  <div class="section-title">Internet Presence</div>
+  <div class="pills-wrap">
+    @foreach($profile['socialMediaPresence'] as $platform => $status)
+      @php $active = is_bool($status) ? $status : true; @endphp
+      <span class="{{ $active ? 'pill-active' : 'pill-inactive' }}">{{ ucfirst($platform) }}: {{ $active ? 'Active' : 'Inactive' }}</span>
+    @endforeach
+  </div>
+</div>
+@endif
 
-    {{-- Social Media --}}
-    @if(!empty($profile['socialMediaPresence']))
-        <div class="section">
-            <h2>InternetPresence</h2>
-            <div class="grid">
-                @foreach($profile['socialMediaPresence'] as $platform => $status)
-                    <div class="grid-item">
-                        <span class="capitalize">{{ $platform }}:</span>
-                        <span class="{{ $status ? 'status-active' : 'status-inactive' }}">
-                            {{ is_bool($status) ? ($status ? 'Active' : 'Inactive') : 'Active' }}
-                        </span>
-                    </div>
-                @endforeach
-            </div>
-        </div>
-    @endif
-
-    {{-- OSINT Data --}}
-    @if(!empty($data['osintData']))
-        <div class="section">
-            <h2>OSINT Data</h2>
-            <table class="info-table">
-                <thead>
-                    <tr>
-                        <th>Leak Data Found</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach($data['osintData'] as $key => $value)
-                        <tr>
-                            <td>
-                                @if(is_array($value))
-                                    @foreach($value as $item)
-                                        @if(is_string($item) && filter_var($item, FILTER_VALIDATE_URL))
-                                            <a href="{{ $item }}" target="_blank">{{ $item }}</a><br>
-                                        @else
-                                            {{ $item }}<br>
-                                        @endif
-                                    @endforeach
-                                @else
-                                    @if(is_string($value) && filter_var($value, FILTER_VALIDATE_URL))
-                                        <a href="{{ $value }}" target="_blank">{{ $value }}</a>
-                                    @else
-                                        {{ $value }}
-                                    @endif
-                                @endif
-                            </td>
-                        </tr>
-                    @endforeach
-                </tbody>
-            </table>
-        </div>
-    @endif
-
-    {{-- Breach Data --}}
-    @if(!empty($data['breachData']))
-        <div class="section">
-            <h2>Breach Data</h2>
-            <div class="breach-card">
-                @foreach($data['breachData'] as $value)
-                    @if(is_array($value))
-                        <div class="breach-entry">
-                            @if(!empty($value['LogoBase64']))
-                                <img src="{{ $value['LogoBase64'] }}" alt="Logo">
-                            @endif
-                            <strong>{{ $value['Name'] ?? 'Unknown' }}</strong>
-                        </div>
-                    @endif
-                @endforeach
-            </div>
-        </div>
-    @endif
-
-    {{-- Gravatar --}}
-    @if(!empty($data['gravatar']))
-        @foreach($data['gravatar'] as $item)
-            @if($item['source'] === 'Gravatar' && $item['status'] === 'found')
-                <div class="section">
-                    <h2>Gravatar Profile</h2>
-                    <div class="gravatar-card">
-                        @if(!empty($item['avatar_url']))
-                            <img src="{{ $item['avatar_url'] }}" class="gravatar-avatar" alt="{{ $item['username'] ?? 'avatar' }}">
-                        @else
-                            <div class="avatar-placeholder">No Avatar</div>
-                        @endif
-                        <div>
-                            @if(!empty($item['username']))
-                                <p><strong>Username:</strong> {{ $item['username'] }}</p>
-                            @endif
-                            @if(!empty($item['profile_url']))
-                                <p><strong>Profile:</strong> <a href="{{ $item['profile_url'] }}">{{ $item['profile_url'] }}</a></p>
-                            @endif
-                        </div>
-                    </div>
-                </div>
-            @endif
-           @endforeach
-    @endif
-
-    @if(!empty($data['mapData']))
-        <h2> Public Location Data</h2>
-        @foreach($data['mapData'] as $index => $place)
-            <div class="section">
-                <h3 style="font-size:16px; font-weight:bold; color:#1f2937; margin-bottom:8px;">
-                    {{ $place['name'] ?? 'Unknown Place' }}
-                </h3>
-
-                <p style="margin:4px 0;">
-                    <strong class="map-key">Address:</strong> {{ $place['address'] ?? 'N/A' }}
-                </p>
-
-                <p style="margin:4px 0;">
-                    <strong class="map-key">Date:</strong> {{ $place['date'] ?? '' }}
-                </p>
-
-                {{-- Map Image if available --}}
-                @if(!empty($place['mapImage']))
-                    <div style="margin-top:10px;">
-                        <img src="data:image/png;base64,{{ $place['mapImage'] }}" 
-                            alt="Map of {{ $place['name'] ?? 'Location' }}" 
-                            style="width:100%; max-width:500px; border-radius:8px; border:1px solid #ddd;">
-                    </div>
+{{-- ── OSINT / Leak Data ── --}}
+@if(!empty($data['osintData']))
+<div class="section">
+  <div class="section-title">Leak Data Found</div>
+  <table>
+    @foreach($data['osintData'] as $key => $value)
+      <tr>
+        <td colspan="2">
+          @if(is_array($value))
+            @foreach($value as $item)
+              @if(is_string($item))
+                @if(filter_var($item, FILTER_VALIDATE_URL))
+                  <a href="{{ $item }}">{{ $item }}</a><br>
+                @else
+                  {{ $item }}<br>
                 @endif
-            </div>
-        @endforeach
+              @else
+                <pre style="font-size:9px; white-space:pre-wrap; word-break:break-all; margin:0;">{{ is_scalar($item) ? $item : json_encode($item, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) }}</pre>
+              @endif
+            @endforeach
+          @elseif(is_string($value) && filter_var($value, FILTER_VALIDATE_URL))
+            <a href="{{ $value }}">{{ $value }}</a>
+          @else
+            {{ $value }}
+          @endif
+        </td>
+      </tr>
+    @endforeach
+  </table>
+</div>
+@endif
+
+{{-- ── Breach Data ── --}}
+@if(!empty($data['breachData']))
+<div class="section">
+  <div class="section-title">Data Breaches</div>
+  @foreach($data['breachData'] as $breach)
+    @if(is_array($breach))
+    <div class="breach-card">
+      <div class="breach-logo-cell">
+        @if(!empty($breach['LogoBase64']))<img src="{{ $breach['LogoBase64'] }}" alt="logo">@endif
+      </div>
+      <div class="breach-name-cell">{{ $s($breach['Name'] ?? '') ?: 'Unknown Breach' }}</div>
+    </div>
     @endif
-   {{-- Legal Disclaimer --}}
-    <div id="legal-disclaimer" class="section">
+  @endforeach
+</div>
+@endif
 
-        <h2>LEGAL DISCLAIMER FOR OSINT REPORT</h2>
-        <p>
-            This Open Source Intelligence (OSINT) report has been prepared by <strong>OSINTWORK</strong>, a private entity acting solely as a technical intermediary, at the request of, and for the exclusive use of, authorized law enforcement agencies. The information contained in this report has been gathered strictly from publicly accessible sources and legally verified digital tools as of the date of its generation. No leaked, unauthorized, or unlawfully obtained data has been used in its preparation.
-        </p>
-        <ol>
-            <li><strong>Authorized Use:</strong> This report is intended solely for use by duly authorized law enfor
-                    cement officers for legitimate investigative purposes, as defined under Indian law. The requesting agency assumes full responsibility for the lawful, ethical, and appropriate use of the information contained herein.</li>
-
-            <li><strong>Legal Compliance:</strong> Use of this report must be in strict compliance with all applicable Indian laws and regulations, including but not limited to:
-                <ul>
-                    <li>The Information Technology Act, 2000</li>
-                    <li>The Bharatiya Nyaya Sanhita (BNS)</li>
-
-               
-               
-                                   <li>The Bharatiya Nagarik Suraksha Sanhita (BNSS)</li>
-                    <li>The Bharatiya Sakshya Adhiniyam (BSA)</li>
-              
-        
-        
-                                   <li>Relevant constitutional protections, including Article 21 pertaining to the Right to Privacy</li>
-                    <li>Upon its enforcement, the Digital Personal Data Protection Act, 2023</li>
-           
-                             
-  
-                   </ul>
-            </li>
-
-               
-               
-               
-            <li><strong>Data Protection and Retention:</strong> OSINTWORK compiles this report using ethical and legally compliant OSINT methodologies. No personal data is stored post-transmission. The requesting lawenforcement agency bears sole responsibility for ensuring compliance with relevant data protection regulations and internal data handling policies.</li>
-
-            <li><strong>Verification Requirement:</strong> The information in this report is derived from OSINT       techniques and should be treated as preliminary intelligence. It must be independently verified 
-             by the requesting agency through official and legally admissible channels prior to being used in legal proceedings or enforcement actions.</li>
-
-            <li><strong>Confidentiality:</strong> This report is strictly confidential and may not be disclosed,
-                shared, or disseminated beyond the scope of the official investigation for which it was requested. The
-                agency is responsible for maintaining the confidentiality of this document and limiting access to authorized personnel only.</li>
-
-            <li><strong>Limited Liability:</strong> OSINTWORK shall not be held liable for any direct or indirect consequences arising from the use, misuse, or interpretation of the information provided herein. The report is furnished in good faith as an intermediary service, and OSINTWORK makes no representations or warranties regarding the completeness, accuracy, or reliability of the data.</li>
-
-
-           
-           
-                       <li><strong>No Legal Advice:</strong> This report does not constitute legal advice. The recipient agency must consult its own legal counsel for guidance on the lawful and appropriate use of the information contained in this report in investigations, legal filings, or court proceedings.</li>
-
-            <li><strong>Ethical Use:</strong> OSINTWORK adheres to high ethical standards in OSINT collection and reporting. The receiving agency is expected to ensure that the information is used in a manner consistent with ethical law enforcement practices, upholding individual rights without compromising the integrity of legitimate investigations.</li>
-
-            <li><strong>Contractual Obligations:</strong> Use of this report is further subject to any terms and conditions specified in the service agreement or memorandum of understanding between OSINTWORK and the requesting agency.</li>
-        </ol>
-        <p>
-            By accepting and utilizing this report, the law enforcement agency affirms its agreement with the above terms and acknowledges that OSINTWORK acts strictly as an intermediary, without control over source data or its subsequent application. The agency is responsible for ensuring that all personnel handling this report are aware of and fully comply with these terms.
-        </p>
+{{-- ── Gravatar ── --}}
+@if(!empty($data['gravatar']))
+  @foreach($data['gravatar'] as $item)
+    @if(($item['source'] ?? '') === 'Gravatar' && ($item['status'] ?? '') === 'found')
+    <div class="section">
+      <div class="section-title">Gravatar Profile</div>
+      <div class="gravatar-tbl">
+        <div class="gravatar-img-cell">
+          @if(!empty($item['avatar_base64']))<img src="{{ $item['avatar_base64'] }}" alt="avatar">
+          @elseif(!empty($item['avatar_url']))<img src="{{ $item['avatar_url'] }}" alt="avatar">
+          @else<div style="width:60px;height:60px;background:#e8f0fe;border-radius:8px;border:2px solid #0f3460;line-height:60px;text-align:center;font-size:9px;color:#0f3460;">No Photo</div>@endif
+        </div>
+        <div class="gravatar-info-cell">
+          @if(!empty($item['username']))<p><span style="font-weight:bold;color:#0f3460;">Username:</span> {{ $item['username'] }}</p>@endif
+          @if(!empty($item['profile_url']))<p><span style="font-weight:bold;color:#0f3460;">Profile:</span> <a href="{{ $item['profile_url'] }}">{{ $item['profile_url'] }}</a></p>@endif
+        </div>
+      </div>
     </div>
-    <div>
-        <p><strong>Downloaded by:</strong> {{ $userEmail }}</p>
+    @endif
+  @endforeach
+@endif
+
+{{-- ── Public Location Data ── --}}
+@if(!empty($data['mapData']))
+<div class="section">
+  <div class="section-title">Public Location Data</div>
+  @foreach($data['mapData'] as $place)
+    <div class="card">
+      <div class="card-head">{{ $s($place['name'] ?? '') ?: 'Location' }}</div>
+      <div class="card-body">
+        @if($s($place['address'] ?? ''))<div class="card-row"><span class="card-label">Address: </span>{{ $s($place['address']) }}</div>@endif
+        @if($s($place['date'] ?? ''))<div class="card-row"><span class="card-label">Date: </span>{{ $s($place['date']) }}</div>@endif
+        @if(!empty($place['mapImage']))
+          <div style="margin-top:6px;"><img src="data:image/png;base64,{{ $place['mapImage'] }}" alt="map" style="width:100%;max-width:420px;border-radius:6px;border:1px solid #d0dce8;"></div>
+        @endif
+      </div>
     </div>
+  @endforeach
+</div>
+@endif
+
+{{-- ── Legal Disclaimer ── --}}
+<div class="disclaimer">
+  <div class="disclaimer-title">Legal Disclaimer</div>
+  <p style="margin-bottom:6px;">This Email Intelligence report has been prepared by <strong>{{ config('app.name', 'DRASHTA') }}</strong>, acting solely as a technical intermediary, for the exclusive use of authorized personnel. Information is gathered from publicly accessible sources and legally verified digital tools.</p>
+  <ol>
+    <li><strong>Authorized Use:</strong> Intended solely for duly authorized personnel for legitimate investigative purposes.</li>
+    <li><strong>Legal Compliance:</strong> Use must comply with the IT Act 2000, BNS, BNSS, BSA, Article 21, and the DPDP Act 2023.</li>
+    <li><strong>Verification Required:</strong> Data must be independently verified before use in legal proceedings.</li>
+    <li><strong>Confidentiality:</strong> This report is strictly confidential — do not share beyond the scope of the official investigation.</li>
+    <li><strong>Limited Liability:</strong> {{ config('app.name', 'DRASHTA') }} assumes no liability for the use, misuse, or interpretation of information herein.</li>
+  </ol>
+</div>
+
+@include('report.partials.footer')
 
 </body>
-
 </html>
