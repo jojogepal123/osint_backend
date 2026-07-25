@@ -51,6 +51,17 @@ class ApiServiceController extends Controller
         ]);
     }
 
+    private function extractResultList(array $body): array
+    {
+        foreach (['data', 'results', 'records'] as $key) {
+            if (isset($body[$key]) && is_array($body[$key]) && ! empty($body[$key])) {
+                return $body[$key];
+            }
+        }
+
+        return [];
+    }
+
     private function checkApiPermission(array $requestedSlugs): array
     {
         if (empty($requestedSlugs)) {
@@ -752,7 +763,6 @@ class ApiServiceController extends Controller
         $data = $request->input('fields');
         $page = (int) $request->query('page', 1);
         $perPage = (int) $request->query('per_page', 10);
-        $anySuccessful = false;
         if (! $data || ! is_array($data)) {
             return response()->json(['error' => 'Invalid search data'], 400);
         }
@@ -796,34 +806,67 @@ class ApiServiceController extends Controller
             $fastapiUrl = env('OSINTDATA_URL');
             $response = Http::withHeaders($headers)->timeout(30)->get($fastapiUrl, $params);
 
-            if ($response->successful()) {
-                $data = $response->json();
-                $anySuccessful = true;
-                if ($anySuccessful) {
-                    $deduction = env('LEAKDATA_COST');
+            $upstreamStatus = $response->status();
+            $body = $response->json();
 
-                    if ($user->credits >= $deduction) {
-                        $user->credits -= $deduction;
-                        $user->save();
+            if ($upstreamStatus >= 200 && $upstreamStatus < 300) {
+                $body = is_array($body) ? $body : [];
+                $results = $this->extractResultList($body);
 
-                        if ($searchQuery) {
-                            $this->saveSearchResult($searchQuery, $data);
-                        }
-                    } else {
-                        return response()->json([
-                            'message' => 'Insufficient credits.',
-                            'credits' => $user->credits,
-                        ], 402);
-                    }
+                if (empty($results)) {
+                    return response()->json([
+                        'data' => [],
+                        'total' => 0,
+                        'page' => $page,
+                        'per_page' => $perPage,
+                        'credits' => $user->credits,
+                        'message' => 'No results found.',
+                    ]);
+                }
+
+                $deduction = env('LEAKDATA_COST');
+
+                if ($user->credits < $deduction) {
+                    return response()->json([
+                        'message' => 'Insufficient credits.',
+                        'credits' => $user->credits,
+                    ], 402);
+                }
+
+                $user->credits -= $deduction;
+                $user->save();
+
+                if ($searchQuery) {
+                    $this->saveSearchResult($searchQuery, $body);
                 }
 
                 return response()->json([
-                    ...$data,
+                    ...$body,
                     'credits' => $user->credits,
                 ]);
-            } else {
-                return response()->json(['error' => 'Failed to fetch data from API'], 500);
             }
+
+            if ($upstreamStatus >= 400 && $upstreamStatus < 500) {
+                Log::info('Leak Data Finder: No records found.', [
+                    'params' => $params,
+                    'url' => $fastapiUrl,
+                    'upstream_status' => $upstreamStatus,
+                ]);
+
+                return response()->json([
+                    'data' => [],
+                    'total' => 0,
+                    'page' => $page,
+                    'per_page' => $perPage,
+                    'credits' => $user->credits,
+                    'message' => 'No results found.',
+                ], 200);
+            }
+
+            return response()->json([
+                'error' => 'Failed to fetch data from API',
+                'credits' => $user->credits,
+            ], 500);
         } catch (Exception $e) {
             Log::error('Leak Data Finder Error', [
                 'error' => $e->getMessage(),
