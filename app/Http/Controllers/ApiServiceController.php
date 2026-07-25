@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 // use Google\Service\Storage;
 use App\Models\SearchQuery;
 use App\Models\SearchResult;
+use App\Services\SearchCache;
 use Exception;
 use HlrLookup\HLRLookupClient;
 use Illuminate\Http\Client\ConnectionException;
@@ -41,6 +42,36 @@ class ApiServiceController extends Controller
             'ip_address' => request()->ip(),
             'case_id' => $this->getActiveCaseId(),
         ]);
+    }
+
+    /**
+     * Look up an existing SearchQuery (with its saved SearchResult) for the same
+     * (type, normalized-value) pair. If one exists, return the cached payload the
+     * controller can return immediately. Otherwise create a fresh SearchQuery and
+     * return null so the caller can run the upstream lookup.
+     *
+     * @return array{cached: bool, payload?: array, query?: SearchQuery}
+     */
+    private function findCachedOrLog(string $type, mixed $value): array
+    {
+        $cached = SearchCache::findHit($type, $value);
+
+        if ($cached && $cached->result) {
+            $user = auth()->user();
+            $payload = SearchCache::cachedResponsePayload(
+                $cached,
+                $user ? (float) $user->credits : 0.0,
+            );
+
+            if ($payload !== null) {
+                return ['cached' => true, 'payload' => $payload];
+            }
+        }
+
+        $queryString = is_array($value) ? json_encode($value) : (string) $value;
+        $fresh = $this->logSearchQuery($queryString, $type);
+
+        return ['cached' => false, 'query' => $fresh];
     }
 
     private function saveSearchResult(SearchQuery $searchQuery, array $results): void
@@ -157,7 +188,16 @@ class ApiServiceController extends Controller
             }
 
             $number = $raw;
-            $searchQuery = $this->logSearchQuery($number, 'phone');
+            $cacheLookup = $this->findCachedOrLog('phone', $number);
+            if ($cacheLookup['cached']) {
+                $user = auth()->user();
+                if ($user) {
+                    $cacheLookup['payload']['credits'] = (float) $user->credits;
+                }
+
+                return response()->json($cacheLookup['payload']);
+            }
+            $searchQuery = $cacheLookup['query'];
 
             $user = auth()->user();
             $urls = [
@@ -395,6 +435,10 @@ class ApiServiceController extends Controller
 
             if (isset($searchQuery)) {
                 $responseData['search_query_id'] = $searchQuery->id;
+                $responseData['search_query_public_id'] = $searchQuery->public_id;
+                if ($anySuccessful && ! empty(array_filter($data))) {
+                    $this->saveSearchResult($searchQuery, $data);
+                }
             }
 
             return response()->json($responseData);
@@ -417,7 +461,16 @@ class ApiServiceController extends Controller
             ]);
 
             $email = $request->query('email');
-            $searchQuery = $this->logSearchQuery($email, 'email');
+            $cacheLookup = $this->findCachedOrLog('email', $email);
+            if ($cacheLookup['cached']) {
+                $user = auth()->user();
+                if ($user) {
+                    $cacheLookup['payload']['credits'] = (float) $user->credits;
+                }
+
+                return response()->json($cacheLookup['payload']);
+            }
+            $searchQuery = $cacheLookup['query'];
 
             $user = auth()->user();
 
@@ -546,6 +599,10 @@ class ApiServiceController extends Controller
 
             if (isset($searchQuery)) {
                 $responseData['search_query_id'] = $searchQuery->id;
+                $responseData['search_query_public_id'] = $searchQuery->public_id;
+                if ($anySuccessful && ! empty($data)) {
+                    $this->saveSearchResult($searchQuery, ['data' => $data]);
+                }
             }
 
             return response()->json($responseData);
@@ -577,7 +634,13 @@ class ApiServiceController extends Controller
             ]);
         }
 
-        $searchQuery = $this->logSearchQuery($upiId, 'upi');
+        $cacheLookup = $this->findCachedOrLog('upi', $upiId);
+        if ($cacheLookup['cached']) {
+            $cacheLookup['payload']['credits'] = (float) $user->credits;
+
+            return response()->json($cacheLookup['payload']);
+        }
+        $searchQuery = $cacheLookup['query'];
         try {
             $response = Http::withHeaders([
                 'Authorization' => 'Bearer '.env('SUREPASS_KYC_TOKEN'),
@@ -644,7 +707,13 @@ class ApiServiceController extends Controller
             ]);
         }
 
-        $searchQuery = $this->logSearchQuery($idNumber, 'vehicle');
+        $cacheLookup = $this->findCachedOrLog('vehicle', $idNumber);
+        if ($cacheLookup['cached']) {
+            $cacheLookup['payload']['credits'] = (float) $user->credits;
+
+            return response()->json($cacheLookup['payload']);
+        }
+        $searchQuery = $cacheLookup['query'];
         try {
             $response = Http::withHeaders([
                 'Authorization' => 'Bearer '.env('SUREPASS_KYC_TOKEN'),
@@ -711,7 +780,13 @@ class ApiServiceController extends Controller
             ]);
         }
 
-        $searchQuery = $this->logSearchQuery($rcNumber, 'challan');
+        $cacheLookup = $this->findCachedOrLog('challan', $rcNumber);
+        if ($cacheLookup['cached']) {
+            $cacheLookup['payload']['credits'] = (float) $user->credits;
+
+            return response()->json($cacheLookup['payload']);
+        }
+        $searchQuery = $cacheLookup['query'];
         try {
             $response = Http::withHeaders([
                 'Authorization' => 'Bearer '.env('SUREPASS_KYC_TOKEN'),
@@ -778,7 +853,13 @@ class ApiServiceController extends Controller
             ]);
         }
 
-        $searchQuery = $this->logSearchQuery(json_encode($data), 'leak');
+        $cacheLookup = $this->findCachedOrLog('leak', $data);
+        if ($cacheLookup['cached']) {
+            $cacheLookup['payload']['credits'] = (float) $user->credits;
+
+            return response()->json($cacheLookup['payload']);
+        }
+        $searchQuery = $cacheLookup['query'];
 
         $params = [
             'page' => $page,
@@ -912,7 +993,16 @@ class ApiServiceController extends Controller
             }
         }
 
-        $searchQuery = $this->logSearchQuery(json_encode($data), 'corporate');
+        $cacheLookup = $this->findCachedOrLog('corporate', $data);
+        if ($cacheLookup['cached']) {
+            $user = auth()->user();
+            if ($user) {
+                $cacheLookup['payload']['credits'] = (float) $user->credits;
+            }
+
+            return response()->json($cacheLookup['payload']);
+        }
+        $searchQuery = $cacheLookup['query'];
 
         switch ($type) {
             case 'corporate_gstin':
@@ -1298,7 +1388,13 @@ class ApiServiceController extends Controller
             }
         }
 
-        $searchQuery = $this->logSearchQuery(json_encode($data), 'verification');
+        $cacheLookup = $this->findCachedOrLog('verification', $data);
+        if ($cacheLookup['cached']) {
+            $cacheLookup['payload']['credits'] = (float) $user->credits;
+
+            return response()->json($cacheLookup['payload']);
+        }
+        $searchQuery = $cacheLookup['query'];
         if (! $type || ! $data) {
             Log::error('Missing type or data in request');
 
@@ -1774,7 +1870,13 @@ class ApiServiceController extends Controller
             }
         }
 
-        $searchQuery = $this->logSearchQuery($value, 'social');
+        $cacheLookup = $this->findCachedOrLog('social', $value);
+        if ($cacheLookup['cached']) {
+            $cacheLookup['payload']['credits'] = (float) $user->credits;
+
+            return response()->json($cacheLookup['payload']);
+        }
+        $searchQuery = $cacheLookup['query'];
 
         try {
             $response = Http::withHeaders([
@@ -1795,6 +1897,10 @@ class ApiServiceController extends Controller
             }
 
             $json = $response->json();
+
+            // Embed candidate photos as base64 so the cached body is fully
+            // self-contained and can be rendered later without an extra fetch.
+            $json = $this->embedSocialPhotoBase64($json);
 
             // Deduct credits on success
             $deduction = (int) env('SOCIAL_INTEL_COST', env('SOCIAL_INTEL_COST', 1));
@@ -1820,6 +1926,65 @@ class ApiServiceController extends Controller
             Log::error('socialIntelSearch exception', ['message' => $e->getMessage()]);
 
             return response()->json(['error' => 'Something went wrong. Please try again.'], 500);
+        }
+    }
+
+    /**
+     * Walk a SignalHire response and base64-encode each candidate's photo URL
+     * into `photo.urlBase64`. If the photo cannot be fetched, the candidate
+     * keeps its original `photo.url` so the client can still try to render
+     * it directly.
+     */
+    private function embedSocialPhotoBase64(array $body): array
+    {
+        if (! isset($body['results']) || ! is_array($body['results'])) {
+            return $body;
+        }
+
+        foreach ($body['results'] as $i => $row) {
+            if (! is_array($row) || ! isset($row['candidate']['photo']['url'])) {
+                continue;
+            }
+
+            $url = $row['candidate']['photo']['url'];
+            $base64 = $this->fetchImageAsBase64($url);
+
+            if ($base64 !== null) {
+                $body['results'][$i]['candidate']['photo']['urlBase64'] = $base64;
+            }
+        }
+
+        return $body;
+    }
+
+    /**
+     * Best-effort fetch of a remote image and base64-encoding as a data URL.
+     * Returns null on any failure.
+     */
+    private function fetchImageAsBase64(string $url): ?string
+    {
+        try {
+            $response = Http::timeout(8)->get($url);
+
+            if (! $response->successful()) {
+                return null;
+            }
+
+            $contentType = $response->header('Content-Type') ?? 'image/jpeg';
+            // Strip any charset etc.
+            $mime = trim(explode(';', (string) $contentType)[0]);
+            if ($mime === '') {
+                $mime = 'image/jpeg';
+            }
+
+            return 'data:'.$mime.';base64,'.base64_encode($response->body());
+        } catch (Throwable $e) {
+            Log::warning('fetchImageAsBase64 failed', [
+                'url' => $url,
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
         }
     }
 }
