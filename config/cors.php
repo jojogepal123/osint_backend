@@ -2,11 +2,11 @@
 
 return [
 
-    'paths' => ['api/*', 'login', 'logout', 'sanctum/csrf-cookie', 'forgot-password', 'password-reset', 'register'],
+    'paths' => ['api/*', 'sanctum/csrf-cookie', 'login', 'logout', 'register', 'forgot-password', 'password-reset', 'verify-email/*'],
 
     'allowed_methods' => ['*'],
 
-    'allowed_origins' => [env('FRONTEND_URL', 'http://localhost:3000')],
+    'allowed_origins' => array_filter(array_map('trim', explode(',', env('FRONTEND_URL', 'http://localhost:3000')))),
 
     'allowed_origins_patterns' => [],
 
