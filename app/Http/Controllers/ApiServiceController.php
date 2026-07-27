@@ -48,9 +48,9 @@ class ApiServiceController extends Controller
      * Look up an existing SearchQuery (with its saved SearchResult) for the same
      * (type, normalized-value) pair. If one exists, return the cached payload the
      * controller can return immediately. Otherwise create a fresh SearchQuery and
-     * return null so the caller can run the upstream lookup.
+     * return it so the caller can run the upstream lookup.
      *
-     * @return array{cached: bool, payload?: array, query?: SearchQuery}
+     * @return array{cached: bool, payload?: array, query?: SearchQuery, search_query?: SearchQuery}
      */
     private function findCachedOrLog(string $type, mixed $value): array
     {
@@ -64,7 +64,11 @@ class ApiServiceController extends Controller
             );
 
             if ($payload !== null) {
-                return ['cached' => true, 'payload' => $payload];
+                return [
+                    'cached' => true,
+                    'payload' => $payload,
+                    'search_query' => $cached,
+                ];
             }
         }
 
@@ -72,6 +76,29 @@ class ApiServiceController extends Controller
         $fresh = $this->logSearchQuery($queryString, $type);
 
         return ['cached' => false, 'query' => $fresh];
+    }
+
+    /**
+     * Build the cache-hit response: copy the saved body and overlay
+     * `cached`, `search_query_id`, `search_query_public_id`, and `credits`
+     * on top. Returns a fresh array (PHP copy-on-write) so the stored
+     * SearchResult row is never mutated.
+     */
+    private function respondCached(array $cacheLookup): \Illuminate\Http\JsonResponse
+    {
+        $payload = $cacheLookup['payload'];
+        $cached = $cacheLookup['search_query'];
+
+        $payload['cached'] = true;
+        $payload['search_query_id'] = $cached->id;
+        $payload['search_query_public_id'] = $cached->public_id;
+
+        $user = auth()->user();
+        if ($user) {
+            $payload['credits'] = (float) $user->credits;
+        }
+
+        return response()->json($payload);
     }
 
     private function saveSearchResult(SearchQuery $searchQuery, array $results): void
@@ -190,12 +217,7 @@ class ApiServiceController extends Controller
             $number = $raw;
             $cacheLookup = $this->findCachedOrLog('phone', $number);
             if ($cacheLookup['cached']) {
-                $user = auth()->user();
-                if ($user) {
-                    $cacheLookup['payload']['credits'] = (float) $user->credits;
-                }
-
-                return response()->json($cacheLookup['payload']);
+                return $this->respondCached($cacheLookup);
             }
             $searchQuery = $cacheLookup['query'];
 
@@ -463,12 +485,7 @@ class ApiServiceController extends Controller
             $email = $request->query('email');
             $cacheLookup = $this->findCachedOrLog('email', $email);
             if ($cacheLookup['cached']) {
-                $user = auth()->user();
-                if ($user) {
-                    $cacheLookup['payload']['credits'] = (float) $user->credits;
-                }
-
-                return response()->json($cacheLookup['payload']);
+                return $this->respondCached($cacheLookup);
             }
             $searchQuery = $cacheLookup['query'];
 
@@ -998,12 +1015,7 @@ class ApiServiceController extends Controller
 
         $cacheLookup = $this->findCachedOrLog('corporate', $data);
         if ($cacheLookup['cached']) {
-            $user = auth()->user();
-            if ($user) {
-                $cacheLookup['payload']['credits'] = (float) $user->credits;
-            }
-
-            return response()->json($cacheLookup['payload']);
+            return $this->respondCached($cacheLookup);
         }
         $searchQuery = $cacheLookup['query'];
 
@@ -1869,9 +1881,7 @@ class ApiServiceController extends Controller
 
         $cacheLookup = $this->findCachedOrLog('social', $value);
         if ($cacheLookup['cached']) {
-            $cacheLookup['payload']['credits'] = (float) $user->credits;
-
-            return response()->json($cacheLookup['payload']);
+            return $this->respondCached($cacheLookup);
         }
         $searchQuery = $cacheLookup['query'];
 
