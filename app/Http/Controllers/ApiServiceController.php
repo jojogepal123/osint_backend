@@ -932,6 +932,8 @@ class ApiServiceController extends Controller
                     'params' => $params,
                     'url' => $fastapiUrl,
                     'upstream_status' => $upstreamStatus,
+                    'upstream_body' => $response->body(),
+                    'upstream_headers' => $response->headers(),
                 ]);
 
                 return response()->json([
