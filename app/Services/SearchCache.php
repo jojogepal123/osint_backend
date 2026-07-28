@@ -63,7 +63,7 @@ class SearchCache
 
         return match ($type) {
             'email' => strtolower(preg_replace('/\s+/', '', trim($value))),
-            'phone', 'social' => self::normalizePhone($value),
+            'phone' => self::normalizePhone($value),
             'vehicle' => strtoupper(preg_replace('/\s+/', '', trim($value))),
             'challan' => strtoupper(preg_replace('/\s+/', '', trim($value))),
             'upi' => strtolower(trim($value)),

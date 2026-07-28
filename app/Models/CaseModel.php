@@ -36,6 +36,20 @@ class CaseModel extends Model
         ];
     }
 
+    protected static function booted(): void
+    {
+        static::creating(function (self $case) {
+            if (empty($case->public_id)) {
+                $case->public_id = (string) \Illuminate\Support\Str::uuid();
+            }
+        });
+    }
+
+    public function getRouteKeyName(): string
+    {
+        return 'public_id';
+    }
+
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class, 'user_id');

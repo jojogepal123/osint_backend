@@ -309,6 +309,35 @@ class CaseController extends Controller
         return response()->json(['message' => 'Case deleted successfully']);
     }
 
+    public function assignableUsers(Request $request, CaseModel $case)
+    {
+        $user = $request->user();
+
+        if (! $user->is_admin && $user->cms_role !== 'supervisor') {
+            return response()->json([]);
+        }
+
+        if (! $this->isCaseMember($user, $case) && ! $user->is_admin) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $memberIds = $case->assignedUsers()->pluck('users.id')->toArray();
+
+        $users = User::whereNotIn('id', $memberIds)
+            ->orderBy('name')
+            ->get(['id', 'name', 'email', 'cms_role', 'is_admin']);
+
+        CaseActivity::log(
+            $case->id,
+            $user->id,
+            'viewed_assignable_users',
+            "Viewed assignable-users list ({$users->count()} users)",
+            ['count' => $users->count()]
+        );
+
+        return response()->json($users);
+    }
+
     public function activities(Request $request, CaseModel $case)
     {
         $user = $request->user();

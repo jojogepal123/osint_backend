@@ -159,6 +159,9 @@ class SearchResultController extends Controller
                 if ($photoUrl) {
                     $data['_photoBase64'] = $this->getImageBase64($photoUrl);
                 }
+                // Drop WebP data URLs: dompdf's imagecreatefromwebp() requires
+                // a GD build with WebP support, which is not always available.
+                $this->stripWebpPhoto($data);
                 $html = View::make('report.social_template', compact('data', 'userEmail'))->render();
             } else {
                 return response()->json(['error' => 'Unsupported search type for download'], 422);
@@ -210,11 +213,55 @@ class SearchResultController extends Controller
                 return null;
             }
 
-            $type = pathinfo($url, PATHINFO_EXTENSION);
+            $type = strtolower(pathinfo($url, PATHINFO_EXTENSION));
+
+            // Skip WebP: dompdf's imagecreatefromwebp() requires a GD build
+            // with WebP support, which is not always available. Returning null
+            // makes the social template fall back to the candidate's initials.
+            if (
+                $type === 'webp' ||
+                (strlen($imgData) >= 12 &&
+                    substr($imgData, 0, 4) === 'RIFF' &&
+                    substr($imgData, 8, 4) === 'WEBP')
+            ) {
+                return null;
+            }
 
             return 'data:image/'.$type.';base64,'.base64_encode($imgData);
         } catch (Exception $e) {
             return null;
+        }
+    }
+
+    /**
+     * Drop `data['photo']['urlBase64']` and `data['_photoBase64']` whenever
+     * they are WebP data URLs. dompdf's imagecreatefromwebp() requires a GD
+     * build with WebP support, which is not always available. Letting the
+     * template fall back to the candidate's initials avatar avoids the
+     * "Function imagecreatefromwebp() not found" error.
+     */
+    private function stripWebpPhoto(array &$data): void
+    {
+        foreach (['_photoBase64', 'photo.urlBase64', 'photoUrl'] as $key) {
+            $value = data_get($data, $key);
+            if (! is_string($value) || $value === '') {
+                continue;
+            }
+            $isWebpDataUrl = str_starts_with($value, 'data:image/webp');
+            if (! $isWebpDataUrl && str_starts_with($value, 'data:')) {
+                $comma = strpos($value, ',');
+                if ($comma !== false) {
+                    $raw = base64_decode(substr($value, $comma + 1), true);
+                    if (is_string($raw) && strlen($raw) >= 12
+                        && substr($raw, 0, 4) === 'RIFF'
+                        && substr($raw, 8, 4) === 'WEBP') {
+                        $isWebpDataUrl = true;
+                    }
+                }
+            }
+            if ($isWebpDataUrl) {
+                data_set($data, $key, null);
+            }
         }
     }
 }

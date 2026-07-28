@@ -100,6 +100,7 @@ Route::middleware(['auth:sanctum', 'token.expire'])->prefix('cases')->group(func
     Route::delete('/{case}/members/{user}', [CaseController::class, 'removeMember']);
     Route::get('/{case}/activities', [CaseController::class, 'activities']);
     Route::get('/{case}/searches', [CaseController::class, 'searches']);
+    Route::get('/{case}/assignable-users', [CaseController::class, 'assignableUsers']);
 });
 
 // USER ACTIVE CASE ROUTES
