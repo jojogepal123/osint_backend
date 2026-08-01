@@ -137,7 +137,7 @@ class SearchResultController extends Controller
             $userInput = $searchQuery->query;
             $type = $searchQuery->type;
 
-            if ($type === 'tel') {
+            if ($type === 'tel' || $type === 'phone') {
                 $html = View::make('report.tel_template', compact('data', 'userEmail', 'userInput'))->render();
             } elseif ($type === 'email') {
                 $html = View::make('report.email_template', compact('data', 'userEmail', 'userInput'))->render();
@@ -164,7 +164,11 @@ class SearchResultController extends Controller
                 $this->stripWebpPhoto($data);
                 $html = View::make('report.social_template', compact('data', 'userEmail'))->render();
             } else {
-                return response()->json(['error' => 'Unsupported search type for download'], 422);
+                return response()->json([
+                    'error' => 'PDF report not yet supported for this search type',
+                    'type' => $type,
+                    'supported_types' => ['tel', 'phone', 'email', 'vehicle', 'upi', 'challan', 'verification', 'social'],
+                ], 501);
             }
 
             $pdf = Pdf::loadHTML($html);
@@ -183,22 +187,10 @@ class SearchResultController extends Controller
 
     private function canAccessSearchQuery($user, SearchQuery $searchQuery): bool
     {
-        if ($user->is_admin) {
-            return true;
-        }
-
-        if ($searchQuery->user_id === $user->id) {
-            return true;
-        }
-
-        if ($searchQuery->case_id) {
-            $case = $searchQuery->case;
-            if ($case && $case->assignedUsers()->where('user_id', $user->id)->exists()) {
-                return true;
-            }
-        }
-
-        return false;
+        // Cached search results are globally readable to any authenticated
+        // user except auditor. Auditors are read-only at the OSINT layer and
+        // shouldn't peek at saved investigations.
+        return $user !== null && $user->cms_role !== 'auditor';
     }
 
     private function getImageBase64($url): ?string
