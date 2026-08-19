@@ -70,6 +70,8 @@ Route::middleware(['auth:sanctum', 'token.expire', 'admin', 'throttle:60,1'])->p
     Route::put('/users/{id}', [AdminController::class, 'updateUser']);
     Route::delete('/users/{id}', [AdminController::class, 'deleteUser']);
     Route::get('/queries', [AdminController::class, 'queries']);
+    Route::get('/queries/{key}/impact', [AdminController::class, 'queryDeleteImpact']);
+    Route::delete('/queries/{key}', [AdminController::class, 'deleteQuery']);
     Route::get('/users/{id}/queries', [AdminController::class, 'userQueries']);
     Route::get('/api-engines', [AdminController::class, 'apiEngines']);
     Route::get('/users/{id}/permissions', [AdminController::class, 'userPermissions']);

@@ -5,8 +5,11 @@ namespace App\Http\Controllers;
 use App\Models\ApiEngine;
 use App\Models\SearchQuery;
 use App\Models\User;
+use App\Services\SearchCache;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
 
 class AdminController extends Controller
@@ -277,15 +280,23 @@ class AdminController extends Controller
     {
         $request->validate([
             'search' => 'sometimes|string|max:100',
+            'user' => 'sometimes|string|max:100',
             'type' => 'sometimes|in:'.implode(',', self::VALID_TYPES),
             'user_id' => 'sometimes|integer|min:1',
             'page' => 'sometimes|integer|min:1|max:1000',
         ]);
 
-        $query = SearchQuery::with(['user:id,name,email', 'result'])->latest();
+        $query = SearchQuery::with(['user:id,name,email', 'user.latestIp', 'result'])->latest();
 
         if ($search = $request->query('search')) {
             $query->where('query', 'like', "%{$search}%");
+        }
+
+        if ($name = $request->query('user')) {
+            $query->whereHas('user', function ($q) use ($name) {
+                $q->where('name', 'like', "%{$name}%")
+                    ->orWhere('email', 'like', "%{$name}%");
+            });
         }
 
         if ($type = $request->query('type')) {
@@ -297,6 +308,133 @@ class AdminController extends Controller
         }
 
         return response()->json($query->paginate(20));
+    }
+
+    // ── Resolve a Search Query by public_id, falling back to numeric id ──
+    private function resolveSearchQuery(string $key): SearchQuery
+    {
+        $row = SearchQuery::where('public_id', $key)->first();
+
+        if (! $row && ctype_digit($key)) {
+            $row = SearchQuery::find((int) $key);
+        }
+
+        abort_if(! $row, 404, 'Search query not found.');
+
+        return $row;
+    }
+
+    /**
+     * Every hash under which this row could be serving cached data.
+     *
+     * SearchCache::findHit() hashes the value it was handed, while the row
+     * stores the hash of the stringified query, so array-valued types (leak,
+     * corporate) can carry a different hash than the lookup computes. Matching
+     * on the whole set keeps the purge correct either way.
+     *
+     * NULLs are dropped on purpose: where('query_hash', null) compiles to
+     * IS NULL and would match every hashless row of that type.
+     *
+     * @return array<int, string>
+     */
+    private function cacheHashesFor(SearchQuery $row): array
+    {
+        $hashes = [$row->query_hash];
+
+        if (! empty($row->type)) {
+            $hashes[] = SearchCache::hash($row->type, $row->query);
+
+            $decoded = json_decode((string) $row->query, true);
+            if (is_array($decoded)) {
+                $hashes[] = SearchCache::hash($row->type, $decoded);
+            }
+        }
+
+        return array_values(array_unique(array_filter($hashes)));
+    }
+
+    // ── Delete Impact Preview ────────────────────────────────────────
+    public function queryDeleteImpact(string $key)
+    {
+        $row = $this->resolveSearchQuery($key);
+        $hashes = $this->cacheHashesFor($row);
+
+        $siblings = $hashes === []
+            ? collect()
+            : SearchQuery::where('type', $row->type)
+                ->whereIn('query_hash', $hashes)
+                ->where('id', '!=', $row->id)
+                ->get(['id', 'case_id']);
+
+        return response()->json([
+            'total_count' => $siblings->count() + 1,
+            'sibling_count' => $siblings->count(),
+            'case_count' => $siblings->pluck('case_id')
+                ->push($row->case_id)
+                ->filter()
+                ->unique()
+                ->count(),
+        ]);
+    }
+
+    // ── Delete a Search Query & Purge its Cached Result ─────────────────────
+    /**
+     * Hard-deletes the row plus every sibling sharing its (type, cache hash),
+     * so SearchCache::findHit() can no longer serve a stale body and the next
+     * search of that value goes upstream again. Attached search_results rows
+     * follow via the FK cascade.
+     *
+     * A search already in flight when this runs may still write its result
+     * afterwards and become the new cache — that data came from a live
+     * upstream call, so the guarantee holds.
+     */
+    public function deleteQuery(string $key)
+    {
+        $row = $this->resolveSearchQuery($key);
+        $hashes = $this->cacheHashesFor($row);
+
+        [$deletedCount, $affectedCaseIds] = DB::transaction(function () use ($row, $hashes) {
+            $targets = SearchQuery::query()
+                ->when(
+                    $hashes === [],
+                    fn ($q) => $q->where('id', $row->id),
+                    fn ($q) => $q->where('type', $row->type)->whereIn('query_hash', $hashes),
+                )
+                ->lockForUpdate()
+                ->get(['id', 'case_id']);
+
+            $ids = $targets->pluck('id')->all();
+            $caseIds = $targets->pluck('case_id')->filter()->unique()->values()->all();
+
+            // The target row is only in $targets when its own hash matched;
+            // make sure it always goes.
+            if (! in_array($row->id, $ids, true)) {
+                $ids[] = $row->id;
+            }
+
+            SearchQuery::whereIn('id', $ids)->delete();
+
+            return [count($ids), $caseIds];
+        });
+
+        $this->auditLog('SEARCH_QUERY_DELETED', [
+            'target_id' => $row->id,
+            'target_public_id' => $row->public_id,
+            'type' => $row->type,
+            // Truncated: query values are PII (phone / email / ID numbers).
+            'query' => Str::limit((string) $row->query, 200),
+            'owner_user_id' => $row->user_id,
+            'case_id' => $row->case_id,
+            'deleted_count' => $deletedCount,
+            'affected_case_ids' => $affectedCaseIds,
+        ]);
+
+        return response()->json([
+            'message' => 'Search query deleted. The next search of this value will fetch fresh data.',
+            'deleted_count' => $deletedCount,
+            'deleted_id' => $row->id,
+            'deleted_public_id' => $row->public_id,
+        ]);
     }
 
     // ── User's Search Queries ───────────────────────────────────────────────

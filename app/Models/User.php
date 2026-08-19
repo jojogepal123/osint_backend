@@ -6,6 +6,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
@@ -63,6 +64,15 @@ class User extends Authenticatable
     public function ips()
     {
         return $this->hasMany(UserIp::class);
+    }
+
+    /**
+     * The IP recorded at this user's most recent login. The admin query log
+     * falls back to it when a search was logged behind a proxy.
+     */
+    public function latestIp(): HasOne
+    {
+        return $this->hasOne(UserIp::class)->latestOfMany();
     }
 
     public function searchQueries()
