@@ -31,13 +31,18 @@ class SearchResultController extends Controller
             'type' => ['required', 'in:tel,email,vehicle,upi,challan,leak,corporate,verification,social'],
             'user_input' => ['required', 'string'],
             'results' => ['required', 'array'],
-            'search_query_id' => ['sometimes', 'integer', 'exists:search_queries,id'],
+            'search_query_id' => ['sometimes', 'nullable', 'integer', 'exists:search_queries,id'],
+            'search_query_public_id' => ['sometimes', 'nullable', 'string'],
         ]);
 
         $user = $request->user();
 
-        if (! empty($validated['search_query_id'])) {
-            $searchQuery = SearchQuery::find($validated['search_query_id']);
+        // Target an existing query by numeric id, falling back to the public id
+        // (the live search response may only carry the latter).
+        if (! empty($validated['search_query_id']) || ! empty($validated['search_query_public_id'])) {
+            $searchQuery = ! empty($validated['search_query_id'])
+                ? SearchQuery::find($validated['search_query_id'])
+                : SearchQuery::where('public_id', $validated['search_query_public_id'])->first();
 
             if (! $searchQuery) {
                 return response()->json(['error' => 'Search query not found'], 404);
@@ -138,8 +143,10 @@ class SearchResultController extends Controller
             $type = $searchQuery->type;
 
             if ($type === 'tel' || $type === 'phone') {
+                $data = $this->normalizeReportPayload($data);
                 $html = View::make('report.tel_template', compact('data', 'userEmail', 'userInput'))->render();
             } elseif ($type === 'email') {
+                $data = $this->normalizeReportPayload($data);
                 $html = View::make('report.email_template', compact('data', 'userEmail', 'userInput'))->render();
             } elseif ($type === 'vehicle') {
                 $html = View::make('report.rc_template', compact('data', 'userEmail'))->render();
@@ -177,12 +184,30 @@ class SearchResultController extends Controller
             return $pdf->download($filename);
         } catch (\Throwable $e) {
             Log::error('PDF generation failed', [
-                'search_query_id' => $searchQueryId,
+                'search_query_id' => $searchQuery->id,
                 'error' => $e->getMessage(),
             ]);
 
             return response()->json(['error' => 'Failed to generate PDF'], 500);
         }
+    }
+
+    /**
+     * Normalise a stored tel/email payload for the report templates.
+     *
+     * Rows written by ApiServiceController at search time hold the raw
+     * per-API shape, where `osintData` is the upstream envelope
+     * `{ data: [...], page, total, per_page, status }`. The templates expect
+     * the curated shape the frontend saves, where `osintData` is a flat list
+     * of leak records. Unwrapping here is a no-op for the curated shape.
+     */
+    private function normalizeReportPayload(array $data): array
+    {
+        if (isset($data['osintData']['data']) && is_array($data['osintData']['data'])) {
+            $data['osintData'] = $data['osintData']['data'];
+        }
+
+        return $data;
     }
 
     private function canAccessSearchQuery($user, SearchQuery $searchQuery): bool

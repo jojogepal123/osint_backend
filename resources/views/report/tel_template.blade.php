@@ -29,6 +29,14 @@
   $subjectPhone = '';
   if (!empty($profile['phones'][0]['value'])) $subjectPhone = $profile['phones'][0]['value'];
   elseif (!empty($data['phone'])) $subjectPhone = $data['phone'];
+  // Legacy rows stored in the raw per-API shape carry no profile; fall back to
+  // the query itself. $userInput is only passed by SearchResultController.
+  elseif (!empty($userInput ?? null)) $subjectPhone = $userInput;
+
+  // `osintData` may still arrive as the upstream envelope { data: [...], ... }.
+  $leaks = $data['osintData'] ?? [];
+  if (isset($leaks['data']) && is_array($leaks['data'])) $leaks = $leaks['data'];
+  if (!is_array($leaks)) $leaks = [];
 @endphp
 
 @include('report.partials.header', ['reportType' => 'Phone Intelligence Report'])
@@ -218,30 +226,28 @@
 @endif
 
 {{-- ── OSINT / Leak Data ── --}}
-@if(!empty($data['osintData']))
+@if(!empty($leaks))
 <div class="section">
   <div class="section-title">Leak Data Found</div>
-  <table>
-    @foreach($data['osintData'] as $value)
-      <tr>
-        <td colspan="2">
-          @if(is_array($value))
-            @foreach($value as $item)
-              @if(is_string($item) && filter_var($item, FILTER_VALIDATE_URL))
-                <a href="{{ $item }}">{{ $item }}</a><br>
-              @elseif(is_scalar($item))
-                {{ $item }}<br>
-              @endif
-            @endforeach
-          @elseif(is_string($value) && filter_var($value, FILTER_VALIDATE_URL))
-            <a href="{{ $value }}">{{ $value }}</a>
-          @elseif(is_scalar($value))
-            {{ $value }}
-          @endif
-        </td>
-      </tr>
-    @endforeach
-  </table>
+  @foreach($leaks as $record)
+    @php $row = is_array($record) ? $record : ['Value' => $record]; @endphp
+    <table style="margin-bottom:10px;">
+      @foreach($row as $key => $value)
+        @php $display = $s($value, ''); @endphp
+        @continue($display === '')
+        <tr>
+          <th width="35%">{{ ucwords(str_replace(['_', '-'], ' ', (string) $key)) }}</th>
+          <td>
+            @if(is_string($value) && filter_var($value, FILTER_VALIDATE_URL))
+              <a href="{{ $value }}">{{ $value }}</a>
+            @else
+              {{ $display }}
+            @endif
+          </td>
+        </tr>
+      @endforeach
+    </table>
+  @endforeach
 </div>
 @endif
 
