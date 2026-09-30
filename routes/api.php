@@ -77,6 +77,8 @@ Route::middleware(['auth:sanctum', 'token.expire', 'admin', 'throttle:60,1'])->p
     Route::get('/users/{id}/permissions', [AdminController::class, 'userPermissions']);
     Route::put('/users/{id}/permissions', [AdminController::class, 'updateUserPermissions']);
     Route::post('/users/{id}/sync-permissions', [AdminController::class, 'syncAdminPermissions']);
+    Route::get('/logs', [AdminController::class, 'logs']);
+    Route::delete('/logs', [AdminController::class, 'clearLogs']);
 });
 
 Route::get('/registration-status', function () {

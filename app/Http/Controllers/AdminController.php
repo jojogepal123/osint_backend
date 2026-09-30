@@ -517,4 +517,90 @@ class AdminController extends Controller
 
         return response()->json(['message' => 'Permissions updated.']);
     }
+
+    // ── Application Logs ────────────────────────────────────────────────────
+    private const LOG_LEVELS = ['emergency', 'alert', 'critical', 'error', 'warning', 'notice', 'info', 'debug'];
+
+    /**
+     * Parse storage/logs/laravel.log and return entries (newest first).
+     * Query params: level (default "error" = error and above), search, page, per_page.
+     */
+    public function logs(Request $request)
+    {
+        $level = strtolower($request->query('level', 'error'));
+        abort_unless(in_array($level, ['all', ...self::LOG_LEVELS]), 400, 'Invalid level.');
+        $search = trim((string) $request->query('search', ''));
+        $perPage = min(max((int) $request->query('per_page', 50), 1), 200);
+        $page = max((int) $request->query('page', 1), 1);
+
+        $path = storage_path('logs/laravel.log');
+        if (!is_file($path)) {
+            return response()->json(['data' => [], 'total' => 0, 'page' => 1, 'last_page' => 1, 'file_size' => 0]);
+        }
+
+        // Only read the tail of very large files to keep this fast.
+        $maxBytes = 5 * 1024 * 1024;
+        $size = filesize($path);
+        $fh = fopen($path, 'r');
+        if ($size > $maxBytes) {
+            fseek($fh, -$maxBytes, SEEK_END);
+            fgets($fh); // drop partial line
+        }
+        $content = stream_get_contents($fh);
+        fclose($fh);
+
+        // Split into entries: each starts with "[YYYY-MM-DD HH:MM:SS] env.LEVEL:"
+        $chunks = preg_split('/^(?=\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\] \w+\.\w+:)/m', $content, -1, PREG_SPLIT_NO_EMPTY);
+
+        $allowed = $level === 'all'
+            ? self::LOG_LEVELS
+            : array_slice(self::LOG_LEVELS, 0, array_search($level, self::LOG_LEVELS) + 1);
+
+        $entries = [];
+        foreach ($chunks as $chunk) {
+            if (!preg_match('/^\[([^\]]+)\] (\w+)\.(\w+): (.*)$/s', rtrim($chunk), $m)) {
+                continue;
+            }
+            $entryLevel = strtolower($m[3]);
+            if (!in_array($entryLevel, $allowed)) {
+                continue;
+            }
+            $body = $m[4];
+            if ($search !== '' && stripos($body, $search) === false) {
+                continue;
+            }
+            $lines = explode("\n", $body, 2);
+            $entries[] = [
+                'timestamp' => $m[1],
+                'env' => $m[2],
+                'level' => $entryLevel,
+                'message' => Str::limit(trim($lines[0]), 500),
+                'context' => isset($lines[1]) ? Str::limit(trim($lines[1]), 5000) : null,
+            ];
+        }
+
+        $entries = array_reverse($entries);
+        $total = count($entries);
+        $lastPage = max((int) ceil($total / $perPage), 1);
+        $data = array_slice($entries, ($page - 1) * $perPage, $perPage);
+
+        return response()->json([
+            'data' => $data,
+            'total' => $total,
+            'page' => $page,
+            'last_page' => $lastPage,
+            'file_size' => $size,
+            'truncated' => $size > $maxBytes,
+        ]);
+    }
+
+    public function clearLogs()
+    {
+        $path = storage_path('logs/laravel.log');
+        if (is_file($path)) {
+            file_put_contents($path, '');
+        }
+        $this->auditLog('LOGS_CLEARED');
+        return response()->json(['message' => 'Log file cleared.']);
+    }
 }

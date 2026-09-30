@@ -54,6 +54,9 @@ return [
 
     'url' => env('APP_URL', 'http://localhost'),
     'furl' => env('FRONTEND_URL'),
+
+    // URL prefix of the admin panel (frontend page routes). Keep in sync with VITE_ADMIN_PATH.
+    'admin_path' => trim(env('ADMIN_PATH', 'admin'), '/'),
     /*
     |--------------------------------------------------------------------------
     | Application Timezone
