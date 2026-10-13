@@ -14,6 +14,9 @@ RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
 # Install Redis extension (optional but recommended)
 RUN pecl install redis && docker-php-ext-enable redis
 
+# Hide PHP version (X-Powered-By header)
+RUN echo "expose_php=Off" > /usr/local/etc/php/conf.d/hardening.ini
+
 # Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
