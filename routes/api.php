@@ -6,7 +6,6 @@ use App\Http\Controllers\Auth\EmailVerificationNotificationController;
 use App\Http\Controllers\Auth\VerifyEmailController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CaseController;
-use App\Http\Controllers\GoogleAuthController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\SearchResultController;
 use App\Http\Controllers\UserController;
@@ -86,9 +85,6 @@ Route::get('/registration-status', function () {
         'registration_enabled' => config('auth.registration_enabled'),
     ]);
 });
-
-// googlelogin route
-Route::post('/google-login', [GoogleAuthController::class, 'googleLogin']);
 
 // CMS CASE ROUTES
 Route::middleware(['auth:sanctum', 'token.expire'])->prefix('cases')->group(function () {
